@@ -990,6 +990,7 @@ const downloadQuotedMedia = async (quoted) => {
 ┃📦 *𝚅𝙴𝚁𝚂𝙸𝙾𝙽* : V1
 ┃📅 *𝙳𝙰𝚃𝙴* : ${slDate}
 ┃⌚ *𝚃𝙸𝙼𝙴* : ${slTimeNow}
+┃📁 *Owner* : 𝗜ꜱᴀɴᴋᴀ ◊
 ┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛
 
 ${readMore}
@@ -1048,8 +1049,7 @@ ${readMore}
 │₊❏❜ ⋮ •hack ➜ ꜱᴇɴᴅ ʜᴀᴄᴋɪɴɢ ᴍꜱɢ
 ╰──────────────────<𝟑 .ᐟ
 
-> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`
-> *ʙᴏᴛ ᴅᴇᴘᴏʟʏ ʟɪɴᴋ* : `kadiya-md-production.up.railway.app`,
+> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`,
         contextInfo: arabianCtx()
       }, { quoted: msg });
 
