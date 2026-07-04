@@ -75,7 +75,7 @@ const config = {
     MAX_RETRIES: 3,
     ADMIN_LIST_PATH: './admin.json',
     AKIRA_IMG: 'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    NEWSLETTER_JID: '120363419619460838@newsletter',
+    NEWSLETTER_JID: '120363399723529947@newsletter',
     NEWSLETTER_LIST: [
         '120363425584831057@newsletter',
         '120363422562980426@newsletter'
@@ -84,9 +84,9 @@ const config = {
     OTP_EXPIRY: 300000,
     OWNER_NUMBER: '94763353368',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029Vb69K9665yDEFt3DRR0D',
-    ANTI_LINK: 'false',
-    ANTI_BADWORD: 'false',
-    BAD_WORDS: ['fuck', 'shit', 'bitch', 'asshole', 'bastard', 'dick', 'pussy', 'cunt', 'porn', 'wtf']
+    ANTI_LINK: 'true',
+    ANTI_BADWORD: 'true',
+    BAD_WORDS: ['හුත්තා', 'shit', 'bitch', 'asshole', 'bastard', 'dick', 'pussy', 'cunt', 'porn', 'wtf']
 };
 
 const replyFq = (text) => reply(text);
@@ -761,7 +761,7 @@ async function EmpirePair(number, res) {
                         image: { url: config.AKIRA_IMG },
                         caption: formatMessage(
                             '`*↳ ❝ [🎀 𝗪𝗲𝗹𝗹𝗰𝗼𝗺𝗲 𝗧𝗼 𝗞𝗮𝗱𝗶𝘆𝗮 𝗠𝗜𝗡𝗜 🎀] ¡! ❞*`',
-                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝗜ꜱᴀɴᴋᴀ ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - https://akira.gotukolaya.site`,
+                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝗜ꜱᴀɴᴋᴀ ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - kadiya-md-production.up.railway.app`,
                             '𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆'
                         )
                     });
