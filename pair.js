@@ -1262,6 +1262,70 @@ case 'alive': {
     break;
 }
 
+	// ════════════ FREE FIRE PLAYER INFO ════════════
+
+case 'ff':
+case 'ffinfo': {
+    try {
+        const playerUID = args[0]?.trim();
+        if (!playerUID) return reply(`🎮 *Plz Send Me A Free Fire Player UID!* \n📋 Example: ${sessionConfig.PREFIX}ff 123456789`);
+
+        try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
+
+        // Fetch Player Info from Web Link API
+        const apiUrl = `https://ff-id-info-4-akira-girl-8bru.vercel.app/player-info?uid=${playerUID}`;
+        const res = await axios.get(apiUrl, { timeout: 20000 });
+
+        if (!res.data || res.data.error || res.data.status === "failed") {
+            return reply("❌ *Player Not Found or API Error! Please check the UID.*");
+        }
+
+        const data = res.data;
+
+        // Constructing Response Message Profile
+        let ffMsg = `*↳ ❝ [🎀 𝗙𝗙 𝗔𝗰𝗰𝗼𝘂𝗻𝘁 𝗜𝗻𝗳𝗼 🎀] ¡! ❞*\n\n`;
+        
+        // Account Info
+        ffMsg += `╭─⊹₊⟡⋆『 \`Account Data\` 』𖤐.ᐟ\n`;
+        ffMsg += `│🧬 *Name:* ${data.account_name || 'N/A'}\n`;
+        ffMsg += `│🆔 *UID:* ${playerUID}\n`;
+        ffMsg += `│🆙 *Level:* ${data.level || 'N/A'}\n`;
+        ffMsg += `│❤️ *Likes:* ${data.likes || 'N/A'}\n`;
+        ffMsg += `│🌍 *Region:* ${data.region || 'N/A'}\n`;
+        ffMsg += `╰──────────────────<𝟑 .ᐟ\n\n`;
+
+        // Rank Details
+        ffMsg += `╭─⊹₊⟡⋆『 \`Rank Details\` 』𖤐.ᐟ\n`;
+        ffMsg += `│🏆 *BR Rank:* ${data.br_rank || 'N/A'} (${data.br_points || '0'} pts)\n`;
+        ffMsg += `│⚔️ *CS Rank:* ${data.cs_rank || 'N/A'} (${data.cs_points || '0'} pts)\n`;
+        ffMsg += `╰──────────────────<𝟑 .ᐟ\n\n`;
+
+        // Guild Details
+        ffMsg += `╭─⊹₊⟡⋆『 \`Guild Details\` 』𖤐.ᐟ\n`;
+        ffMsg += `│🛡️ *Guild Name:* ${data.guild_name || 'No Guild'}\n`;
+        ffMsg += `│🆔 *Guild ID:* ${data.guild_id || 'N/A'}\n`;
+        ffMsg += `│👑 *Leader Jid:* ${data.guild_leader || 'N/A'}\n`;
+        ffMsg += `╰──────────────────<𝟑 .ᐟ\n\n`;
+        
+        ffMsg += `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜<b>සංක</b> 𝜗𝜚⋆*`;
+
+        // Sending Info as image caption or text
+        await socket.sendMessage(sender, {
+            image: { url: akira }, // Bot එකේ random image එකක් සමග යැවීමට
+            caption: ffMsg,
+            contextInfo: arabianCtx()
+        }, { quoted: msg });
+
+        try { await socket.sendMessage(sender, { react: { text: '🎮', key: msg.key } }); } catch (_) {}
+
+    } catch (e) {
+        console.error("FF CMD ERROR:", e);
+        reply("❌ *API error or Player UID not active!*");
+        try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+    }
+    break;
+}
+	
 // ════════════ SYSTEM ════════════
 
     case 'system': {
