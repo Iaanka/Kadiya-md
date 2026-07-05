@@ -1317,6 +1317,69 @@ case 'alive': {
       break;
 	}
 
+// ════════════ send ════════════
+
+case 'send': {
+      try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
+
+      try {
+          // 1. Reply කරපු message එකක් තියෙනවාද කියා බැලීම
+          const quotedMsg = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+          
+          if (!quotedMsg) {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ කරුණාකර ඔබට අවශ්‍ය Status එකට Reply එකක් විදිහට `.send` ලබාදෙන්න." }, { quoted: msg });
+          }
+
+          // 2. ඒක Status එකක්ද (Status JID එක status@broadcast ද) කියා පරීක්ෂා කිරීම
+          const isStatus = msg.message.extendedTextMessage?.contextInfo?.participant === 'status@broadcast';
+          
+          if (!isStatus) {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ මෙය WhatsApp Status එකක් නොවේ. කරුණාකර Status එකකටම reply කරන්න." }, { quoted: msg });
+          }
+
+          // 3. Media Type එක අඳුනා ගැනීම (Image හෝ Video)
+          const type = Object.keys(quotedMsg)[0];
+          if (type !== 'imageMessage' && type !== 'videoMessage') {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ මේ status එකේ download කරන්න පුළුවන් Image හෝ Video එකක් නැහැ." }, { quoted: msg });
+          }
+
+          // 4. Media එක Download කරගැනීම (Buffer එකක් ලෙස)
+          // සටහන: downloadMediaMessage function එක require('@whiskeysockets/baileys') වලින් උඩින්ම import කර තිබිය යුතුය.
+          const downloadContext = { message: quotedMsg };
+          const buffer = await downloadMediaMessage(downloadContext, 'buffer', {});
+
+          const mediaType = type === 'videoMessage' ? 'video' : 'image';
+          const originalCaption = quotedMsg[type].caption || ""; 
+
+          // 5. ඔයාගේ බොට් එකේ style එකටම නිමැවුණු Caption එක
+          const statusInfo = `*↳ ❝ [🎀 𝗦𝘁𝗮𝘁𝘂𝘀 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ¡! ❞*\n\n` +
+                             `┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓\n` +
+                             `┃ *📝 𝙲𝙰𝙿𝚃𝙸𝙾𝙽:* ${originalCaption || 'No Caption'}\n` +
+                             `┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛\n\n` +
+                             `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜<b>ꜱ</b>𝗮𝗻𝗸𝗮 𝜗𝜚⋆*`;
+
+          // 6. 'You' (ඔබ වෙතම) Auto Send කිරීම
+          await socket.sendMessage(sender, {
+              [mediaType]: buffer,
+              caption: statusInfo,
+              contextInfo: arabianCtx() // ඔයාගේ බොට් එකේ context style එකම පාවිච්චි කර ඇත
+          }, { quoted: msg });
+
+          // සාර්ථක වුණාම React එක ✅ කරනවා
+          try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+
+      } catch (error) {
+          console.error("Status Downloader Error:", error);
+          try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+          await socket.sendMessage(sender, { text: "⚠️ Status එක download කිරීමේදී දෝෂයක් වුණා. නැවත උත්සාහ කරන්න." }, { quoted: msg });
+      }
+      break;
+}
+
+			
 // ════════════ SONG ════════════
 
 case 'song':
