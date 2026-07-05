@@ -1283,43 +1283,6 @@ case 'alive': {
 
 // ════════════ SONG ════════════
 					
-    case "apk": {
-        try {
-            // Reaction එකක් දානවා (📥)
-            await conn.sendMessage(from, { react: { text: '📥', key: mek.key }});
-            
-            // Text එකක් (Link/Name) දීලා නැත්නම් message එකක් යවනවා
-            if (!q) return conn.sendMessage(from, { text: "🌸 *Please provide an APK link, sweetie~* 🌸" }, { quoted: mek });
-
-            // APK එක download කරගන්නවා
-            const data = await apkdl.download(q);
-            
-            // විස්තර ටික ලස්සනට caption එකට හදාගන්නවා
-            let cuteCaption = `📱 *Cute APK Downloader* 📱\n\n📚 *Name:* ${data.name}\n📦 *Package:* ${data.package}\n🔄 *Last Update:* ${data.lastup}\n📏 *Size:* ${data.size}\n\n🌐 *Powered by nexus*`;
-
-            // App icon එකයි විස්තරයි මුලින්ම යවනවා
-            await conn.sendMessage(from, { image: { url: data.icon }, caption: cuteCaption }, { quoted: mek });
-
-            // APK File එක document එකක් විදිහට යවනවා
-            let sendapk = await conn.sendMessage(from, { 
-                document: { url: data.dllink }, 
-                mimetype: 'application/vnd.android.package-archive', 
-                fileName: data.name + '.apk', 
-                caption: '' 
-            }, { quoted: mek });
-            
-            // වැඩේ ඉවර වුණාම reactions දානවා
-            await conn.sendMessage(from, { react: { text: '📁', key: sendapk.key }});
-            await conn.sendMessage(from, { react: { text: '✔', key: mek.key }});
-            
-        } catch (e) {
-            reply("💔 *Error downloading APK!*");
-            console.log(e);
-        }
-    }
-    break;
-}
-
 // ════════════ SYSTEM ════════════
 
     case 'system': {
