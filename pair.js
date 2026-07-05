@@ -1283,59 +1283,68 @@ case 'alive': {
 
 // ════════════ CUTE APK DOWNLOADER (200% STABLE FIX) ════════════
 
+// ════════════ APK DOWNLOADER WITH TIME & DIRECT URL (ANTI-CRASH) ════════════
+
 case 'apk':
 case 'apkdl': {
     try {
-        // Query (q) එක හෝ args වලින් ලින්ක්/නම ගන්නවා
-        const apkQuery = q || args.join(' ')?.trim();
-        if (!apkQuery) return reply(`🌸 *Please provide an APK link or name, sweetie~* 🌸 \n📋 Example: ${sessionConfig.PREFIX}apk facebook`);
+        const text = args.join(' ');
+        if (!text) return reply("🌸 *Send me an APK name or link, sweetie~*");
 
-        // Reaction එකක් දානවා (📥)
+        try { await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } }); } catch (_) {}
+ 
+        // APK එක search/download කිරීමට ලිබ් එක පාවිච්චි කිරීම
+        const data = await apkdl.download(text);
+
+        // ඇප් එක හොයාගන්න බැරි වුණොත් ආරක්ෂිතව නවත්වනවා
+        if (!data || !data.dllink) return reply("❌ *I can't find this APK! Please check the name again.*");
+
+        // ලංකාවේ දිනය සහ වෙලාව ලබා ගැනීම
+        const slDate = moment().tz('Asia/Colombo').format('YYYY-MM-DD');
+        const slTimeNow = moment().tz('Asia/Colombo').format('HH:mm:ss');
+
+        let caption = `*↳ ❝ [🎀 𝗞𝗮𝗱𝗶𝘆𝗮 替代 🎀] ¡! ❞*\n\n` +
+                        `📚 *NAME :* ${data.name || 'N/A'}\n` +
+                        `📦 *PACKAGE :* ${data.package || 'N/A'}\n` +
+                        `🔄 *LAST UPDATE :* ${data.lastup || 'N/A'}\n` +
+                        `📏 *SIZE :* ${data.size || 'N/A'}\n` +
+                        `__________________________\n\n` +
+                        `📅 *DATE :* ${slDate} | ⌚ *TIME :* ${slTimeNow}\n\n` +
+                        `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜<b>සංක</b> 𝜗𝜚⋆*`;
+
         try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
 
-        // APK Download කරගැනීම
-        const data = await apkdl.download(apkQuery);
+        // Icon එක විතරක් Buffer එකකට ගන්නවා (ලොකු නැති නිසා අවුලක් වෙන්නෙ නෑ)
+        let iconBuffer = null;
+        if (data.icon) {
+            try {
+                const imgRes = await axios.get(data.icon, { responseType: 'arraybuffer' });
+                iconBuffer = Buffer.from(imgRes.data);
+            } catch (_) {}
+        }
 
-        // විස්තර ටික ලස්සනට Format කරගන්නවා (ඔයාගේ FF ඩිසයින් එකටමයි)
-        let cuteCaption = `*↳ ❝ [🎀 𝗔𝗣𝗞 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ¡! ❞*\n\n`;
-        
-        cuteCaption += `╭─⊹₊⟡⋆『 \`Application Data\` 』𖤐.ᐟ\n`;
-        cuteCaption += `│📚 *Name:* ${data.name || 'N/A'}\n`;
-        cuteCaption += `│📦 *Package:* ${data.package || 'N/A'}\n`;
-        cuteCaption += `│🔄 *Last Update:* ${data.lastup || 'N/A'}\n`;
-        cuteCaption += `│📏 *Size:* ${data.size || 'N/A'}\n`;
-        cuteCaption += `╰──────────────────<𝟑 .ᐟ\n\n`;
-        
-        cuteCaption += `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜<b>සංක</b> 𝜗𝜚⋆*`;
-
-        // App Icon එකයි Caption එකයි මුලින්ම යවනවා (FF එකේ වගේම contextInfo එක්ක)
-        await socket.sendMessage(sender, {
-            image: { url: data.icon },
-            caption: cuteCaption,
-            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : {}
+        // 🚀 මෙතනදී direct url එක දෙන නිසා සර්වර් එක crash වෙන්නේ නෑ!
+        let sendapk = await socket.sendMessage(sender, {
+            document: { url: data.dllink },
+            mimetype: 'application/vnd.android.package-archive',
+            caption: caption,
+            fileName: `${data.name || 'Application'}.apk`,
+            jpegThumbnail: iconBuffer
         }, { quoted: msg });
 
-        // APK File එක Document එකක් විදිහට යවනවා
-        let sendapk = await socket.sendMessage(sender, { 
-            document: { url: data.dllink }, 
-            mimetype: 'application/vnd.android.package-archive', 
-            fileName: (data.name || 'App') + '.apk', 
-            caption: '' 
-        }, { quoted: msg });
-        
-        // වැඩේ සාර්ථකව ඉවර වුණාම දාන Reactions
+        // වැඩේ සාර්ථකව ඉවර වුණාම Reactions දානවා
         try { await socket.sendMessage(sender, { react: { text: '📁', key: sendapk.key } }); } catch (_) {}
-        try { await socket.sendMessage(sender, { react: { text: '✔', key: msg.key } }); } catch (_) {}
+        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
 
     } catch (e) {
-        console.error("APK DOWNLOAD CMD ERROR:", e);
-        reply("💔 *Error downloading APK! පසුව උත්සාහ කරන්න.*");
+        console.log("APK CMD ERROR:", e);
+        reply("❌ *ERROR try again later !*");
         try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
     }
     break;
 }
 
-					
+				
 // ════════════ SYSTEM ════════════
 
     case 'system': {
