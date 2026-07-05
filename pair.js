@@ -1483,7 +1483,7 @@ case 'sinhalasubdl': {
     // පළමු ප්‍රතිඵලය සහ එහි ලින්ක් එක ලබාගැනීම
     const firstMovie = searchJson.results[0];
     const movieUrl = firstMovie.link || firstMovie.url;
-    const movieTitle = firstMovie.title || firstMovie.name;
+    const movieTitle = firstMovie.title || firstMovie.name || 'Movie';
 
     if (!movieUrl) {
       return await socket.sendMessage(sender, { text: '❌ චිත්‍රපටයේ ලින්ක් එක ලබා ගැනීමට නොහැකි විය!' }, { quoted: msg });
@@ -1492,23 +1492,23 @@ case 'sinhalasubdl': {
     // පියවර 2: ඩවුන්ලෝඩ් එක පටන් ගත් බව හැඟවීමට රියැක්ෂන් එක වෙනස් කරනවා
     try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
 
-    // 2. සොයාගත් ලින්ක් එක ඩවුන්ලෝඩ් API එකට යැවීම
-    const dlResponse = await fetch(`https://api.zanta-mini.store/api/sinhalasub/dl?apiKey=zan_w8lSd1pK_t79f2pa52p&text=${encodeURIComponent(movieUrl)}`);
+    // 2. සොයාගත් ලින්ක් එක ඩවුන්ලෝඩ් API එකට යැවීම 
+    // FIXED: මෙතන කලින් &text= තිබ්බේ. ඔයා දීපු ලින්ක් එකේ තිබ්බ විදිහට &url= කරා.
+    const dlResponse = await fetch(`https://api.zanta-mini.store/api/sinhalasub/dl?apiKey=zan_w8lSd1pK_t79f2pa52p&url=${encodeURIComponent(movieUrl)}`);
     const dlJson = await dlResponse.json();
 
-    // ඩවුන්ලෝඩ් ලින්ක් එකක් ලැබී ඇත්දැයි බැලීම (API response එක අනුව dlJson.result හෝ dlJson.url විය හැක)
-    const downloadLink = dlJson.downloadLink || dlJson.result || dlJson.url || dlJson.link;
+    // API එකෙන් ලින්ක් එක එන්න පුළුවන් ක්‍රම කිහිපයක්ම චෙක් කරනවා (Fallback structure)
+    const downloadLink = dlJson.downloadLink || dlJson.result || dlJson.url || (dlJson.results && dlJson.results.downloadLink);
 
     if (!dlJson.status || !downloadLink) {
-      return await socket.sendMessage(sender, { text: `❌ '${movieTitle}' බාගත කිරීමේ ලින්ක් එකක් සොයාගත නොහැකි විය.` }, { quoted: msg });
+      return await socket.sendMessage(sender, { text: `❌ '${movieTitle}' බාගත කිරීමේ ලින්ක් එකක් පද්ධතියෙන් ලබා දුන්නේ නැත.` }, { quoted: msg });
     }
 
-    // 3. වීඩියෝව හෝ ඩොකියුමන්ට් එකක් ලෙස ෆයිල් එක යූසර්ට සෙන්ඩ් කිරීම
-    // (ෆිල්ම් එකේ සයිස් එක විශාල නම් document එකක් ලෙස යැවීම වඩාත් සුදුසුයි)
+    // 3. වීඩියෝව ඩොකියුමන්ට් එකක් ලෙස ෆයිල් එක යූසර්ට සෙන්ඩ් කිරීම
     await socket.sendMessage(sender, {
       document: { url: downloadLink },
       mimetype: 'video/mp4',
-      fileName: `${movieTitle}.mp4`,
+      fileName: `${movieTitle.replace(/[^a-zA-Z0-9 ]/g, "")}.mp4`, // ෆයිල් නේම් එක ක්ලීන් කරා
       caption: `*↳ ❝ [🎀 𝗦𝗶𝗻𝗵𝗮𝗹𝗮 𝗦𝘂𝗯 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ❞*\n\n` +
                `*🎬 Title:* ${movieTitle}\n` +
                `*🔗 Source:* SinhalaSub\n\n` +
