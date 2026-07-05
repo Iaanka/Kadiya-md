@@ -1236,8 +1236,52 @@ ${buildMenuBody(readMore)}
       break;
     }
 
-// ════════════ ALIVE ════════════
+// ════════════ xnxx ════════════
+case 'xnxx': {
+  // පරිශීලකයා සෙවිය යුතු දේ ඇතුළත් කර නැත්නම්
+  if (!text) return await socket.sendMessage(sender, { text: '✍️ කරුණාකර සෙවිය යුතු නම ඇතුළත් කරන්න! (උදා: .xnxx anime)' }, { quoted: msg });
 
+  // මුලින්ම reaction එකක් දානවා
+  try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}     
+  
+  try {
+    // API එකට request එක යැවීම (ඔබේ API Key එක සමඟ)
+    const response = await fetch(`https://api.lolhuman.xyz/api/xnxxsearch?apikey=zan_w8lSd1pK_t79f2pa52p&query=${encodeURIComponent(text)}`);
+    const json = await response.json();
+
+    if (json.status !== 200 || !json.result || json.result.length === 0) {
+      return await socket.sendMessage(sender, { text: '❌ කිසිවක් සොයාගත නොහැකි විය!' }, { quoted: msg });
+    }
+
+    // මුල්ම ප්‍රතිඵල 5ක් තෝරාගෙන text එකක් සකස් කරගැනීම
+    let results = json.result.slice(0, 5);
+    let txt = `*↳ ❝ [🎀 𝗫𝗡𝗫𝗫 𝗦𝗲𝗮𝗿𝗰𝗵 🎀] ¡! ❞*\n\n`;
+    
+    results.forEach((video, index) => {
+      txt += `┏━━━━━°⌜ ${index + 1} ⌟°━━━━━┓\n` +
+             `┃₊❏❜ ⋮🎬 𝚃𝙸𝚃𝙻𝙴 : ${video.title}\n` +
+             `┃₊❏❜ ⋮⏱️ 𝙳𝚄𝚁𝙰𝚃𝙸𝙾𝙽 : ${video.duration}\n` +
+             `┃₊❏❜ ⋮🔗 𝙻𝙸𝙽𝛫 : ${video.link}\n` +
+             `┗━━━━━━━━━━━━━━━━┛\n\n`;
+    });
+    
+    txt += `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`;
+
+    // ප්‍රතිඵල ටික Image එකක් සහ Caption එකක් ලෙස යැවීම
+    await socket.sendMessage(sender, {
+      image: { url: results[0].thumbnail || akira }, // පළමු වීඩියෝවේ thumbnail එක හෝ default image එක
+      caption: txt,
+      contextInfo: arabianCtx()
+    }, { quoted: msg });
+
+  } catch (err) {
+    console.error(err);
+    await socket.sendMessage(sender, { text: '⚠️ API එකේ හෝ සිස්ටම් එකේ දෝෂයක් සිදු විය!' }, { quoted: msg });
+  }
+
+  break;
+}
+// ════════════ ALIVE ════════════
 case 'alive': {
     try { await socket.sendMessage(sender, { react: { text: '🍓', key: msg.key } }); } catch (_) {}
     const startTime = socketCreationTime.get(sanitizedNumber) || Date.now();
