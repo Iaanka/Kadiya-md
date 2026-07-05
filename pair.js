@@ -1234,7 +1234,75 @@ ${buildMenuBody(readMore)}
       }, { quoted: msg });
 
       break;
+	}		
+					
+	// ════════════ ALIVE ════════════
+
+case 'mod':
+case 'modapk': {
+  // පරිශීලකයා ඇතුළත් කල නම (App Name) පරීක්ෂා කිරීම
+  if (!text) return await socket.sendMessage(sender, { text: '✍️ කරුණාකර බාගත යුතු Mod App/Game එකේ නම ඇතුළත් කරන්න! (උදා: .mod Hill Climb Racing)' }, { quoted: msg });
+
+  // පියවර 1: සෙවීම ආරම්භ කල බව හැඟවීමට රියැක්ෂන් එකක් දානවා
+  try { await socket.sendMessage(sender, { react: { text: '🔍', key: msg.key } }); } catch (_) {}     
+  
+  try {
+    // 1. ප්‍රථමයෙන් සර්ච් API එක මඟින් Mod APK ලින්ක් එක සොයාගැනීම
+    const searchResponse = await fetch(`https://api.zanta-mini.store/api/modapk/search?apiKey=zan_w8lSd1pK_t79f2pa52p&url=${encodeURIComponent(text)}`);
+    const searchJson = await searchResponse.json();
+
+    // API එකෙන් ඩේටා ලැබුණේ නැත්නම් හෝ ලැයිස්තුව හිස් නම්
+    if (!searchJson.status || !searchJson.results || searchJson.results.length === 0) {
+      return await socket.sendMessage(sender, { text: '❌ එම නමින් කිසිදු Mod APK එකක් සොයාගත නොහැකි විය!' }, { quoted: msg });
     }
+
+    // පළමු ප්‍රතිඵලය සහ එහි ඇති තොරතුරු ලබාගැනීම
+    const firstApk = searchJson.results[0];
+    const apkUrl = firstApk.link || firstApk.url;
+    const apkTitle = firstApk.title || firstApk.name || text;
+
+    if (!apkUrl) {
+      return await socket.sendMessage(sender, { text: '❌ APK ලින්ක් එක ලබා ගැනීමට නොහැකි විය!' }, { quoted: msg });
+    }
+
+    // පියවර 2: ඩවුන්ලෝඩ් එක පටන් ගත් බව හැඟවීමට රියැක්ෂන් එක වෙනස් කරනවා
+    try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
+
+    // 2. සොයාගත් ලින්ක් එක ඩවුන්ලෝඩ් API එකට යැවීම
+    const dlResponse = await fetch(`https://api.zanta-mini.store/api/modapk/dl?apiKey=zan_w8lSd1pK_t79f2pa52p&url=${encodeURIComponent(apkUrl)}`);
+    const dlJson = await dlResponse.json();
+
+    // API response එක අනුව ඩවුන්ලෝඩ් ලින්ක් එක සහ ඇප් එකේ සයිස් එක ලබාගැනීම
+    const downloadLink = dlJson.downloadLink || dlJson.result || dlJson.url || dlJson.link;
+    const apkSize = dlJson.size || firstApk.size || 'Unknown';
+
+    if (!dlJson.status || !downloadLink) {
+      return await socket.sendMessage(sender, { text: `❌ '${apkTitle}' බාගත කිරීමේ සෘජු ලින්ක් එකක් සොයාගත නොහැකි විය.` }, { quoted: msg });
+    }
+
+    // 3. APK ෆයිල් එක Document එකක් ලෙස යූසර්ට සෙන්ඩ් කිරීම
+    await socket.sendMessage(sender, {
+      document: { url: downloadLink },
+      mimetype: 'application/vnd.android.package-archive', // APK සඳහා නිවැරදි Mimetype එක
+      fileName: `${apkTitle.replace(/[^a-zA-Z0-9 ]/g, "")}.apk`, // File Name එකේ අනවශ්‍ය සංකේත ඉවත් කිරීම
+      caption: `*↳ ❝ [🎀 𝗠𝗼𝗱 𝗔𝗣𝗞 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ❞*\n\n` +
+               `*📦 App:* ${apkTitle}\n` +
+               `*⚖️ Size:* ${apkSize}\n` +
+               `*🛡️ Status:* Premium / Modded\n\n` +
+               `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜𝘀𝗮𝗻𝗸𝗮 𝜗𝜚⋆*`,
+      contextInfo: arabianCtx()
+    }, { quoted: msg });
+
+    // සාර්ථකව නිම වූ පසු ✅ රියැක්ෂන් එකක් දානවා
+    try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}     
+
+  } catch (err) {
+    console.error(err);
+    await socket.sendMessage(sender, { text: '⚠️ මෙම Mod APK එක බාගත කිරීමේදී පද්ධති දෝෂයක් සිදු විය!' }, { quoted: msg });
+  }
+
+  break;
+}
 
 // ════════════ xnxx ════════════
 case 'xnxx': {
