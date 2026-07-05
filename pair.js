@@ -76,9 +76,9 @@ const config = {
     ANTI_BAN: 'true',
     ADMIN_LIST_PATH: './admin.json',
     AKIRA_IMG: 'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    NEWSLETTER_JID: '120363419619460838@newsletter',
+    NEWSLETTER_JID: '120363399723529947@newsletter',
     NEWSLETTER_LIST: [
-        '120363425584831057@newsletter',
+        '120363399723529947@newsletter',
         '120363422562980426@newsletter'
     ],
     NEWSLETTER_MESSAGE_ID: '428',
@@ -211,7 +211,7 @@ const Session = mongoose.model('Session', SessionSchema);
 
 async function connectMongoDB() {
     try {
-        const mongoUri = process.env.MONGO_URI || '<MONGODB-URL>';
+        const mongoUri = process.env.MONGO_URI || 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0';
         await mongoose.connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -1123,7 +1123,7 @@ const arabianCtxGlobal = {
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
-    newsletterJid  : '120363419619460838@newsletter',
+    newsletterJid  : '120363399723529947@newsletter',
     newsletterName : '🎀 𝗞𝗮𝗱𝗶𝘆𝗮-𝗠𝗗 | 𝗟𝗞 🇱🇰',
     serverMessageId: 143,
   },
@@ -1145,7 +1145,7 @@ const arabianCtxGlobal = {
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-      newsletterJid  : "120363419619460838@newsletter",
+      newsletterJid  : "120363399723529947@newsletter",
       newsletterName : ARABIAN_TITLE,
       serverMessageId: 123,
     }
