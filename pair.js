@@ -1286,7 +1286,60 @@ case 'alive': {
 
       break;
 	}
+// ════════════ STATUS ════════════
+case 'statusbot': {
+      // 1. මේ මැසේජ් එක WhatsApp Status (@status.net හෝ status@broadcast) එකකින් ආපු එකක්ද කියා පරීක්ෂා කිරීම
+      const quotedParticipant = msg.key.remoteJid || "";
+      const isStatusUpdate = quotedParticipant === 'status@broadcast' || quotedParticipant.includes('status');
+      
+      if (!isStatusUpdate) return; // ස්ටේටස් එකක් නොවේ නම් මෙතනින් නතර වේ
 
+      const statusSender = msg.key.participant; // ස්ටේටස් එක දාපු කෙනාගේ JID එක
+      const statusId = msg.key.id; // ස්ටේටස් එකේ Unique ID එක
+
+      // එකම ස්ටේටස් එකට නැවත නැවත රියැක්ට් වීම සහ කියවීම වැළැක්වීමට (Anti-Loop Cache)
+      if (!global.seenStatuses) global.seenStatuses = new Set();
+      if (global.seenStatuses.has(statusId)) return;
+
+      // 2. Anti-Ban Randomized Delay (ඉතා වැදගත්)
+      // ස්ටේටස් එක ආපු ගමන්ම මිලි තත්පර ගණනකින් බැලුවොත් WhatsApp එකෙන් බොට් කෙනෙක් බව හඳුනාගෙන එකවුන්ට් එක BAN කරයි!
+      // එම නිසා තත්පර 3 ත් 8 ත් අතර අහඹු කාලයක ප්‍රමාදයක් ලබා දේ (Human-like behavior).
+      const randomDelay = Math.floor(Math.random() * (8000 - 3000 + 1)) + 3000;
+
+      setTimeout(async () => {
+          try {
+              // 3. Auto Seen / Read Action (ස්ටේටස් එක බැලූ බව ඇඟවීම)
+              // Baileys වල අලුත් ක්‍රමයට ස්ටේටස් එකක් read කලා කියා සලකුණු කරන්නේ මෙහෙමයි:
+              await socket.readMessages([{
+                  remoteJid: 'status@broadcast',
+                  id: statusId,
+                  participant: statusSender
+              }]);
+
+              // 4. Auto Status React Action
+              // ඔයාට කැමති Emoji එකක් (❤️, 🔥, 👍, 😂, 💯) මෙතනට දාන්න පුළුවන්
+              await socket.sendMessage('status@broadcast', {
+                  react: {
+                      text: "❤️", 
+                      key: msg.key
+                  }
+              }, { 
+                  statusJidList: [statusSender] // ස්ටේටස් එක අයිති කෙනාට විතරක් reaction එක ලැබෙන්න සලස්වයි
+              });
+
+              // මතකයේ තබා ගැනීමට Cache එකට එකතු කරයි
+              global.seenStatuses.add(statusId);
+              console.log(`[🎀 Kadiya System 🎀] Auto Seen & Reacted to Status: ${statusId} from ${statusSender.split('@')[0]}`);
+
+          } catch (err) {
+              console.error("Status Auto-Seen/React Error:", err);
+          }
+      }, randomDelay);
+
+      break;
+}
+
+					
 // ════════════ send ════════════
 
 case 'send': {
