@@ -1229,177 +1229,128 @@ ${buildMenuBody(readMore)}
       break;
 	}		
 		
-// ════════════ NEWS ════════════
+// ════════════ IMAGINE ════════════
 
-// ========== CONFIG ==========
-const OWNER = '9477XXXXXXXX' // <-- උබේ number එක @ නැතුව දාපන්
-const PREFIX = '.'
-const MONGO_URL = 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0'
+  case 'imagine': {
+        try {
+            let prompt = body.split(' ').slice(1).join(' ');
+            if (!prompt) return reply("❌ *Prompt එකක් ඇතුලත් කරන්න.*\nEx: `.imagine A futuristic sports car`");
 
-// ========== MONGODB ==========
-mongoose.connect(MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true })
-.then(() => console.log('✅ MongoDB Connected'))
-.catch(err => console.log('❌ Mongo Error:', err))
+            // Reaction එකක් දානවා
+            await socket.sendMessage(sender, { react: { text: '🎨', key: msg.key } }).catch(() => {});
 
-const autoReplySchema = new mongoose.Schema({
-    keyword: { type: String, unique: true, lowercase: true },
-    type: { type: String, enum: ['text', 'voice', 'link'] },
-    content: { type: String }
-})
-const AutoReply = mongoose.model('AutoReply', autoReplySchema)
+            // Premium 90s photography look එකක් එන්න prompt එක auto-enhance කරනවා
+            const enhancedPrompt = `${prompt}, 1990s vintage cinematic film aesthetic, highly detailed portrait, shot on Leica SL2 camera, 8k resolution, photorealistic, premium luxury style`;
 
-// Folder
-if(!fs.existsSync('./database/voice')) fs.mkdirSync('./database/voice', { recursive: true })
+            // Stability AI API Request
+            const response = await axios.post('https://api.stability.ai/v1/generation/stable-diffusion-v1-6/text-to-image', {
+                text_prompts: [{ text: enhancedPrompt }],
+                cfg_scale: 7,
+                height: 512,
+                width: 512,
+                samples: 1,
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${process.env.STABILITY_API_KEY}`,
+                },
+                timeout: 20000
+            });
 
-// ========== START BOT ==========
-const startBot = async () => {
-    const { state, saveCreds } = await useMultiFileAuthState('session')
-    const socket = makeWASocket({
-        logger: pino({ level: 'silent' }),
-        auth: state,
-        printQRInTerminal: true,
-        browser: ['Pro Bot', 'Chrome', '1.0.0']
-    })
+            // Base64 image එක temporary file එකක් විදිහට save කරගන්නවා
+            const base64Buffer = Buffer.from(response.data.artifacts[0].base64, 'base64');
+            const imgPath = `./temp_${Date.now()}.png`;
+            fs.writeFileSync(imgPath, base64Buffer);
 
-    socket.ev.on('creds.update', saveCreds)
+            let captionText = `✨ *Prompt:* ${prompt}\n\n`;
+            captionText += `📸 *Style:* 90s Vintage Cinematic\n`;
+            captionText += `⚙️ *Generated via:* Stable Diffusion\n\n`;
+            captionText += `පහල තියෙන Buttons වලින් Image එක Edit කරගන්න 👇`;
 
-    socket.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update
-        if(connection === 'close') {
-            if((lastDisconnect.error)?.output?.statusCode!== DisconnectReason.loggedOut) {
-                startBot()
-            }
-        } else if(connection === 'open') {
-            console.log('✅ Bot Online')
+            // Interactive Buttons එක්ක Image එක යවනවා
+            // buttonId එක ඇතුලෙන්ම image path එක අපි pass කරනවා ඊලඟ පියවරට ලේසි වෙන්න
+            await socket.sendMessage(sender, {
+                image: { url: imgPath },
+                caption: captionText,
+                buttons: [
+                    { buttonId: `edit_ratio_1:1_${imgPath}`, buttonText: { displayText: '🔳 1:1 Square' }, type: 1 },
+                    { buttonId: `edit_ratio_9:16_${imgPath}`, buttonText: { displayText: '📱 9:16 (TikTok/Reels)' }, type: 1 },
+                    { buttonId: `edit_brand_${imgPath}`, buttonText: { displayText: '✍️ Add Admin Label' }, type: 1 }
+                ],
+                viewOnce: false
+            }, { quoted: msg });
+
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        } catch (e) {
+            console.log("IMAGINE ERROR:", e.message);
+            reply("❌ *Image එක generate කරන්න බැරි වුණා. පසුව උත්සාහ කරන්න.*");
         }
-    })
+        break;
+    }
 
-    // ========== MAIN HANDLER ==========
-    socket.ev.on('messages.upsert', async (m) => {
-        if(!m.messages) return
-        const msg = m.messages[0]
-        if(!msg.message || msg.key.fromMe) return
+    // --- BUTTONS HANDLE කරන CASE එක ---
+    // User බොත්තමක් එබුවම වටහාගෙන වැඩ කරන්නේ මෙතනින්
+    case 'buttonsResponseMessage': {
+        try {
+            const buttonId = msg.message.buttonsResponseMessage.selectedButtonId;
+            
+            // අපි හදපු image edit බොත්තමක් නෙවෙයි නම් මේකෙන් අයින් වෙනවා
+            if (!buttonId.startsWith('edit_')) break; 
 
-        const sender = msg.key.remoteJid
-        const isGroup = sender.endsWith('@g.us')
-        const from = isGroup? msg.key.participant : sender
-        const isOwner = from?.includes(OWNER)
+            const [_, action, type, imgPath] = buttonId.split('_');
 
-        const type = Object.keys(msg.message)[0]
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || ''
-
-        const reply = (text) => socket.sendMessage(sender, { text }, { quoted: msg })
-
-        // ========== COMMANDS ==========
-        if(body.startsWith(PREFIX)){
-            const args = body.slice(PREFIX.length).trim().split(/ +/)
-            const command = args.shift().toLowerCase()
-
-            switch(command) {
-                case 'menu': {
-                    reply(`*👑 PRO BOT MENU*
-
-.add [keyword] [text] - Text add
-.add [keyword] [link] - Link add
-Voice ekata reply:.add [keyword]
-.del [keyword] - Delete
-.list - All keywords
-.ping - Speed`)
-                    break;
-                }
-
-                case 'add': {
-                    if(!isOwner) return reply("❌ Owner only")
-                    const keyword = args[0]?.toLowerCase()
-                    if(!keyword) return reply(`Ex: *${PREFIX}add hi hello*`)
-
-                    const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
-                    let data = { keyword, type: 'text', content: '' }
-
-                    try {
-                        // Voice
-                        if(quoted?.audioMessage) {
-                            const stream = await downloadContentFromMessage(quoted.audioMessage, 'audio')
-                            let buffer = Buffer.from([])
-                            for await(const chunk of stream) buffer = Buffer.concat([buffer, chunk])
-                            const file = `./database/voice/${keyword}.ogg`
-                            fs.writeFileSync(file, buffer)
-                            data.type = 'voice'
-                            data.content = file
-                        }
-                        // Link
-                        else if(args[1]?.startsWith('http')) {
-                            data.type = 'link'
-                            data.content = args.slice(1).join(' ')
-                        }
-                        // Text
-                        else {
-                            const text = args.join(' ') || quoted?.conversation || quoted?.extendedTextMessage?.text
-                            if(!text) return reply("❌ Text/Link/Voice dena")
-                            data.content = text
-                        }
-
-                        await AutoReply.findOneAndUpdate({ keyword }, data, { upsert: true, new: true })
-                        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } })
-                        reply(`✅ *Added!*\nKeyword: ${keyword}\nType: ${data.type}`)
-                    } catch(e) {
-                        console.log(e)
-                        reply("❌ Error: " + e.message)
-                    }
-                    break;
-                }
-
-                case 'del': {
-                    if(!isOwner) return reply("❌ Owner only")
-                    const keyword = args[0]?.toLowerCase()
-                    if(!keyword) return reply(`Ex: *${PREFIX}del hi*`)
-                    const del = await AutoReply.findOneAndDelete({ keyword })
-                    reply(del? `✅ *${keyword} deleted*` : `❌ Not found`)
-                    break;
-                }
-
-                case 'list': {
-                    const all = await AutoReply.find()
-                    if(all.length === 0) return reply("❌ Empty")
-                    let list = "*📋 Auto Reply List*\n\n"
-                    all.forEach((x,i) => list += `${i+1}. *${x.keyword}* - ${x.type}\n`)
-                    reply(list)
-                    break;
-                }
-
-                case 'ping': {
-                    const start = Date.now()
-                    const ms = await reply("Pong!")
-                    const end = Date.now()
-                    await socket.sendMessage(sender, { text: `*Speed*: ${end - start}ms` }, { quoted: ms })
-                    break;
-                }
+            // File එක දැනටමත් delete වෙලාද කියලා check කරනවා (safety check)
+            if (!fs.existsSync(imgPath)) {
+                return reply("❌ *Expired/File not found.* කරුණාකර නැවත අලුත් Image එකක් Generate කරන්න.");
             }
-        }
 
-        // ========== AUTO REPLY ==========
-        else {
-            const text = body.toLowerCase().trim()
-            if(text.length === 0) return;
-            const auto = await AutoReply.findOne({ keyword: text })
-            if(auto) {
-                await socket.sendMessage(sender, { react: { text: '🤖', key: msg.key } })
+            await socket.sendMessage(sender, { react: { text: '⚙️', key: msg.key } }).catch(() => {});
 
-                if(auto.type === 'text') reply(auto.content)
-                else if(auto.type === 'voice') {
-                    await socket.sendMessage(sender, {
-                        audio: { url: auto.content },
-                        mimetype: 'audio/ogg; codecs=opus',
-                        ptt: true
-                    }, { quoted: msg })
-                }
-                else if(auto.type === 'link') reply(`🔗 ${auto.content}`)
+            // 1. ASPECT RATIO RESIZE කරන කොටස
+            if (action === 'ratio') {
+                let width = 1080, height = 1080; // Default 1:1
+                if (type === '9:16') { width = 1080; height = 1920; } // TikTok ratio
+
+                const resizedBuffer = await sharp(imgPath)
+                    .resize(width, height, { fit: 'cover' })
+                    .toBuffer();
+
+                await socket.sendMessage(sender, { 
+                    image: resizedBuffer, 
+                    caption: `✅ *Social Media Ready!* (${type} Ratio එකට සාර්ථකව Resize කරා)` 
+                }, { quoted: msg });
             }
+
+            // 2. BRANDING WATERMARK ලේබල් එක දාන කොටස
+            if (action === 'brand') {
+                // කුඩා, premium පෙනුමක් තියෙන Text Label එකක් SVG එකකින් හදනවා
+                const svgText = `
+                    <svg width="300" height="50">
+                        <rect x="0" y="0" width="130" height="28" rx="5" fill="black" fill-opacity="0.5"/>
+                        <text x="12" y="18" font-family="Helvetica, Arial" font-size="12" fill="white" font-weight="bold">Admin Maliya</text>
+                    </svg>
+                `;
+
+                const watermarkedBuffer = await sharp(imgPath)
+                    .composite([{ input: Buffer.from(svgText), top: 15, left: 15 }]) // ඉහල වම් කෙලවරින් ඇඩ් වෙනවා
+                    .toBuffer();
+
+                await socket.sendMessage(sender, { 
+                    image: watermarkedBuffer, 
+                    caption: `✅ *Branding Added!* (Admin Maliya ලේබල් එක ඇතුලත් කරා)` 
+                }, { quoted: msg });
+            }
+
+            await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+        } catch (e) {
+            console.log("BUTTON ERROR:", e.message);
         }
-    })
+        break;
+    }
 }
-
-startBot()
 
 
 // ════════════ WEATHER ════════════
