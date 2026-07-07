@@ -1230,64 +1230,173 @@ ${buildMenuBody(readMore)}
 	}		
 		
 // ════════════ NEWS ════════════
-const axios = require('axios')
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage } = require('@whiskeysockets/baileys')
+const mongoose = require('mongoose')
+const fs = require('fs')
+const pino = require('pino')
 
-//...
-case 'news': {
-    try {
-        const topic = body.split(' ').slice(1).join(' ') || '';
-        await socket.sendMessage(sender, { react: { text: '📰', key: msg.key } }).catch(() => {});
+// ========== CONFIG ==========
+const OWNER = '9477XXXXXXXX' // උබේ number එක @ නැතුව දාපන්
+const PREFIX = '.'
+const MONGO_URL = 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0'
 
-        // Ada Derana + Hiru News RSS
-        const rssUrl = `https://www.adaderana.lk/rss/news.php`;
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=10`;
+// ========== MONGODB ==========
+mongoose.connect(MONGO_URL).then(() => console.log('✅ MongoDB Connected')).catch(err => console.log(err))
 
-        const { data } = await axios.get(apiUrl, { timeout: 15000 });
+const autoReplySchema = new mongoose.Schema({
+    keyword: { type: String, unique: true, lowercase: true },
+    type: { type: String, enum: ['text', 'voice', 'link'] },
+    content: { type: String }
+})
+const AutoReply = mongoose.model('AutoReply', autoReplySchema)
 
-        if(data.status !== 'ok') throw new Error("RSS Error");
+// Folder
+if(!fs.existsSync('./database/voice')) fs.mkdirSync('./database/voice', { recursive: true })
 
-        let articles = data.items;
-        
-        // topic ekak dunna nam filter karanawa
-        if(topic) {
-            articles = articles.filter(item =>
-                item.title.toLowerCase().includes(topic.toLowerCase())
-            ).slice(0,5);
-        } else {
-            articles = articles.slice(0,5);
+// ========== START BOT ==========
+const startBot = async () => {
+    const { state, saveCreds } = await useMultiFileAuthState('session')
+    const socket = makeWASocket({
+        logger: pino({ level: 'silent' }),
+        auth: state,
+        printQRInTerminal: true
+    })
+
+    socket.ev.on('creds.update', saveCreds)
+
+    socket.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update
+        if(connection === 'close') {
+            const reason = new DisconnectReason(lastDisconnect.error)?.output?.statusCode
+            if(reason!== DisconnectReason.loggedOut) startBot()
+        } else if(connection === 'open') {
+            console.log('✅ Bot Online')
         }
+    })
 
-        if(articles.length === 0) return reply(`❌ *"${topic}" gana news hoya ganna bari una*`);
+    // ========== MAIN HANDLER ==========
+    socket.ev.on('messages.upsert', async ({ messages }) => {
+        const msg = messages[0]
+        if(!msg.message || msg.key.fromMe) return
 
-        for(let i = 0; i < articles.length; i++) {
-            const a = articles[i];
-            const date = new Date(a.pubDate).toLocaleString('si-LK');
+        const sender = msg.key.remoteJid
+        const fromMe = sender === OWNER + '@s.whatsapp.net'
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || ''
+        const isOwner = sender.includes(OWNER)
+        const reply = (text) => socket.sendMessage(sender, { text }, { quoted: msg })
 
-            let newsText = `📰 *${i+1}. ${a.title}*\n\n`;
-            newsText += `📝 ${a.description.replace(/<[^>]*>/g, '').slice(0,250)}...\n\n`;
-            newsText += `🗞️ *Source*: Ada Derana\n`;
-            newsText += `⏰ *කාලය*: ${date}\n`;
-            newsText += `🔗 *Read More*: ${a.link}`;
+        // ========== COMMANDS ==========
+        if(body.startsWith(PREFIX)){
+            const args = body.slice(PREFIX.length).trim().split(' ')
+            const command = args[0].toLowerCase()
 
-            if(a.thumbnail) {
-                await socket.sendMessage(sender, {
-                    image: { url: a.thumbnail },
-                    caption: newsText
-                }, { quoted: msg });
-            } else {
-                await socket.sendMessage(sender, { text: newsText }, { quoted: msg });
+            switch(command) {
+                case 'menu': {
+                    const menu = `
+╭━━━〔 *👑 PRO BOT* 〕━━━╮
+┃
+┃ *🛠️ AUTO REPLY*
+┃ ${PREFIX}add [keyword] [text]
+┃ ${PREFIX}add [keyword] [link]
+┃ Voice ekata reply karala: ${PREFIX}add [keyword]
+┃ ${PREFIX}del [keyword]
+┃ ${PREFIX}list
+┃
+┃ *📊 STATUS*
+┃ ${PREFIX}ping
+┃
+╰━━━━━━━━━━━━━━━━━━━━━━╯
+                    `
+                    reply(menu)
+                    break;
+                }
+
+                case 'add': {
+                    if(!isOwner) return reply("❌ *Owner only*")
+                    const keyword = args[1]?.toLowerCase()
+                    if(!keyword) return reply(`Ex: *${PREFIX}add hi hello*`)
+
+                    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
+                    let data = { keyword, type: 'text', content: '' }
+
+                    // Voice
+                    if(quoted?.audioMessage) {
+                        const stream = await downloadContentFromMessage(quoted.audioMessage, 'audio')
+                        let buffer = Buffer.from([])
+                        for await(const chunk of stream) buffer = Buffer.concat([buffer, chunk])
+                        const file = `./database/voice/${keyword}.ogg`
+                        fs.writeFileSync(file, buffer)
+                        data.type = 'voice'
+                        data.content = file
+                    }
+                    // Link
+                    else if(args[2]?.startsWith('http')) {
+                        data.type = 'link'
+                        data.content = args.slice(2).join(' ')
+                    }
+                    // Text
+                    else {
+                        const text = args.slice(2).join(' ') || quoted?.conversation || quoted?.extendedTextMessage?.text
+                        if(!text) return reply("❌ *Text/Link/Voice dena*")
+                        data.content = text
+                    }
+
+                    await AutoReply.findOneAndUpdate({ keyword }, data, { upsert: true })
+                    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } })
+                    reply(`✅ *Added!*\n*Keyword*: ${keyword}\n*Type*: ${data.type}`)
+                    break;
+                }
+
+                case 'del': {
+                    if(!isOwner) return reply("❌ *Owner only*")
+                    const keyword = args[1]?.toLowerCase()
+                    if(!keyword) return reply(`Ex: *${PREFIX}del hi*`)
+                    const del = await AutoReply.findOneAndDelete({ keyword })
+                    reply(del? `✅ *${keyword} deleted*` : `❌ *Not found*`)
+                    break;
+                }
+
+                case 'list': {
+                    const all = await AutoReply.find()
+                    if(all.length === 0) return reply("❌ *Empty*")
+                    let list = "*📋 Auto Reply List*\n\n"
+                    all.forEach((x,i) => list += `${i+1}. *${x.keyword}* - ${x.type}\n`)
+                    reply(list)
+                    break;
+                }
+
+                case 'ping': {
+                    const start = Date.now()
+                    const msg = await reply("Pong!")
+                    const end = Date.now()
+                    await socket.sendMessage(sender, { text: `*Speed*: ${end - start}ms` }, { quoted: msg })
+                    break;
+                }
             }
-            await delay(1500);
         }
 
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        // ========== AUTO REPLY ==========
+        else {
+            const text = body.toLowerCase().trim()
+            const auto = await AutoReply.findOne({ keyword: text })
+            if(auto) {
+                await socket.sendMessage(sender, { react: { text: '🤖', key: msg.key } })
 
-    } catch (e) {
-        console.log("NEWS ERROR:", e.message);
-        reply("❌ *News ගන්න බැරි උනා. Internet check කරන්න හෝ පස්සෙ try කරන්න*");
-    }
-    break;
+                if(auto.type === 'text') reply(auto.content)
+                else if(auto.type === 'voice') {
+                    await socket.sendMessage(sender, {
+                        audio: { url: auto.content },
+                        mimetype: 'audio/ogg; codecs=opus',
+                        ptt: true
+                    }, { quoted: msg })
+                }
+                else if(auto.type === 'link') reply(`🔗 ${auto.content}`)
+            }
+        }
+    })
 }
+
+startBot()
 
 
 // ════════════ WEATHER ════════════
