@@ -1228,49 +1228,58 @@ ${buildMenuBody(readMore)}
     }
 					
 // ════════════ FORWARD ════════════
+import { jidNormalizedUser, delay } from '@whiskeysockets/baileys' // උඩ import tiyenawada balapan
+
+//...
 case 'fw': {
     // Usage:.fw 94763353368,94771234567
-    const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+    const contextInfo = msg.message.extendedTextMessage?.contextInfo;
 
-    if (!quoted) {
-        return reply("📩 *Photo/Video ekata reply karala.fw number,number* \n Ex: `.fw 94763353368`");
+    if (!contextInfo?.quotedMessage) {
+        return reply("📩 *Photo/Video ekata reply karala.fw number* \n Ex: `.fw 94763353368`");
     }
 
     const args = body.split(' ');
-    const numbers = args[1]?.split(',');
+    if (!args[1]) return reply("❌ *Namber eka denna*");
 
-    if (!numbers ||!args[1]) return reply("❌ *Namber ekak hari dena. Ex:.fw 9476xxx*");
-
+    const numbers = args[1].split(',');
     socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
 
     let success = 0;
     let failed = 0;
-    const quotedMsg = msg.message.extendedTextMessage.contextInfo.quotedMessage;
-    const quotedKey = msg.message.extendedTextMessage.contextInfo.stanzaId;
-    const quotedChat = msg.message.extendedTextMessage.contextInfo.remoteJid;
+
+    // Quoted message eke details tika gannawa
+    const quotedMsg = contextInfo.quotedMessage;
+    const quotedJid = contextInfo.remoteJid;
+    const quotedId = contextInfo.stanzaId;
+    const participant = contextInfo.participant || sender;
 
     for (let num of numbers) {
-        const targetNumber = num.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+        const targetNumber = jidNormalizedUser(num.replace(/[^0-9]/g, '') + '@s.whatsapp.net');
 
         try {
-            // මේක තමයි key එක - copyNForward
-            await socket.copyNForward(targetNumber, msg, {
-                forwardingScore: 1, // 1 = Forwarded, 2+ = Forwarded many times
-                readViewOnce: true
-            });
-            success++;
-            await delay(4000); // 4s delay - Ban wenne nathi wenna
+            // KEY METHOD: load the message and forward
+            const message = await socket.loadMessage(quotedJid, quotedId);
+            if (message) {
+                await socket.sendMessage(targetNumber, { forward: message, forwardingScore: 1 });
+                success++;
+            } else {
+                // load karanna bari unoth copyNForward walata watenawa
+                await socket.copyNForward(targetNumber, msg);
+                success++;
+            }
+            await delay(5000); // 5s delay - ban avoid
         } catch (e) {
             failed++;
-            console.log("FW ERROR:", num, e)
+            console.log("FW ERROR:", e);
         }
     }
 
     socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-    reply(`✅ *Iwarai*\n\nYapuwa: ${success}\nBari una: ${failed}`);
+    reply(`✅ *Iwarai*\n\nYapuwa: ${success}\nBari una: ${failed}\n\n_Note: 5s delay damme ban wenne nathi wena_`);
 
     break;
-}		
+}	
 					
 // ════════════ ALIVE ════════════
 
