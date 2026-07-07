@@ -1228,58 +1228,56 @@ ${buildMenuBody(readMore)}
     }
 					
 // ════════════ FORWARD ════════════
-import { jidNormalizedUser, delay } from '@whiskeysockets/baileys' // උඩ import tiyenawada balapan
-
-//...
 case 'fw': {
-    // Usage:.fw 94763353368,94771234567
-    const contextInfo = msg.message.extendedTextMessage?.contextInfo;
-
-    if (!contextInfo?.quotedMessage) {
-        return reply("📩 *Photo/Video ekata reply karala.fw number* \n Ex: `.fw 94763353368`");
-    }
-
-    const args = body.split(' ');
-    if (!args[1]) return reply("❌ *Namber eka denna*");
-
-    const numbers = args[1].split(',');
-    socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
-
-    let success = 0;
-    let failed = 0;
-
-    // Quoted message eke details tika gannawa
-    const quotedMsg = contextInfo.quotedMessage;
-    const quotedJid = contextInfo.remoteJid;
-    const quotedId = contextInfo.stanzaId;
-    const participant = contextInfo.participant || sender;
-
-    for (let num of numbers) {
-        const targetNumber = jidNormalizedUser(num.replace(/[^0-9]/g, '') + '@s.whatsapp.net');
-
-        try {
-            // KEY METHOD: load the message and forward
-            const message = await socket.loadMessage(quotedJid, quotedId);
-            if (message) {
-                await socket.sendMessage(targetNumber, { forward: message, forwardingScore: 1 });
-                success++;
-            } else {
-                // load karanna bari unoth copyNForward walata watenawa
-                await socket.copyNForward(targetNumber, msg);
-                success++;
-            }
-            await delay(5000); // 5s delay - ban avoid
-        } catch (e) {
-            failed++;
-            console.log("FW ERROR:", e);
+    try {
+        const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+        if (!contextInfo?.quotedMessage) {
+            return reply("📩 *Photo/Video ekata reply karala.fw number,number* \n Ex: `.fw 94763353368`");
         }
-    }
 
-    socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-    reply(`✅ *Iwarai*\n\nYapuwa: ${success}\nBari una: ${failed}\n\n_Note: 5s delay damme ban wenne nathi wena_`);
+        const args = body.split(' ');
+        if (!args[1]) return reply("❌ *Namber eka denna*");
+
+        const numbers = args[1].split(',');
+        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+
+        let success = 0;
+        let failed = 0;
+
+        // මේක තමයි trick එක - quoted message eka thamai forward karanne
+        const messageToForward = {
+            key: {
+                remoteJid: contextInfo.remoteJid,
+                fromMe: false,
+                id: contextInfo.stanzaId,
+                participant: contextInfo.participant
+            },
+            message: contextInfo.quotedMessage
+        };
+
+        for (let num of numbers) {
+            const targetNumber = num.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
+
+            try {
+                await socket.forwardMessages(targetNumber, [messageToForward], 1);
+                success++;
+                await delay(5000); // 5s - ban avoid karanna
+            } catch (e) {
+                failed++;
+                console.log("FW ERROR for", num, ":", e.message);
+            }
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        reply(`✅ *Iwarai*\n\nYapuwa: ${success}\nBari una: ${failed}`);
+
+    } catch (err) {
+        console.log("FW CASE CRASH:", err);
+        reply("❌ *Error una. Console eka check karanna*");
+    }
 
     break;
-}	
+}
 					
 // ════════════ ALIVE ════════════
 
