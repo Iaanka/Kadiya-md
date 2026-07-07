@@ -1230,67 +1230,65 @@ ${buildMenuBody(readMore)}
 	}		
 		
 // ════════════ NEWS ════════════
+const axios = require('axios')
+
+//...
 case 'news': {
     try {
-        const topic = body.split(' ').slice(1).join(' ') || 'Sri Lanka';
+        const topic = body.split(' ').slice(1).join(' ') || '';
         await socket.sendMessage(sender, { react: { text: '📰', key: msg.key } }).catch(() => {});
 
-        const API_KEY = '15d4000cd98b4ec59387a8bbb1bb5372';
-        const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(topic)} AND Sri Lanka&language=en&sortBy=publishedAt&pageSize=5&apiKey=${API_KEY}`;
+        // Ada Derana + Hiru News RSS
+        const rssUrl = `https://www.adaderana.lk/rss/news.php`;
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=10`;
 
-        const { data } = await axios.get(url, { timeout: 15000 });
+        const { data } = await axios.get(apiUrl, { timeout: 15000 });
 
-        if(data.status!== 'ok') {
-            return reply(`❌ *API Error: ${data.message || 'Key එක check කරන්න'}*`);
+        if(data.status !== 'ok') throw new Error("RSS Error");
+
+        let articles = data.items;
+        
+        // topic ekak dunna nam filter karanawa
+        if(topic) {
+            articles = articles.filter(item =>
+                item.title.toLowerCase().includes(topic.toLowerCase())
+            ).slice(0,5);
+        } else {
+            articles = articles.slice(0,5);
         }
 
-        if(data.articles.length === 0) {
-            return reply(`❌ *${topic} gana අලුත් News හොයාගන්න බැරි උනා*`);
-        }
+        if(articles.length === 0) return reply(`❌ *"${topic}" gana news hoya ganna bari una*`);
 
-        // Top 5 News tika loop karanawa
-        for(let i = 0; i < data.articles.length; i++) {
-            const a = data.articles[i];
-            const date = new Date(a.publishedAt).toLocaleString('si-LK', {
-                hour: '2-digit',
-                minute: '2-digit',
-                day: '2-digit',
-                month: 'short'
-            });
+        for(let i = 0; i < articles.length; i++) {
+            const a = articles[i];
+            const date = new Date(a.pubDate).toLocaleString('si-LK');
 
             let newsText = `📰 *${i+1}. ${a.title}*\n\n`;
-            newsText += `📝 ${a.description || 'විස්තරයක් නැත'}\n\n`;
-            newsText += `🗞️ *Source*: ${a.source.name}\n`;
+            newsText += `📝 ${a.description.replace(/<[^>]*>/g, '').slice(0,250)}...\n\n`;
+            newsText += `🗞️ *Source*: Ada Derana\n`;
             newsText += `⏰ *කාලය*: ${date}\n`;
-            newsText += `🔗 *Read More*: ${a.url}`;
+            newsText += `🔗 *Read More*: ${a.link}`;
 
-            // Photo eka tiyanawanam photo ekka ewannawa
-            if(a.urlToImage) {
+            if(a.thumbnail) {
                 await socket.sendMessage(sender, {
-                    image: { url: a.urlToImage },
+                    image: { url: a.thumbnail },
                     caption: newsText
                 }, { quoted: msg });
             } else {
                 await socket.sendMessage(sender, { text: newsText }, { quoted: msg });
             }
-
-            await delay(1500); // Spam wenna nathi wenna
+            await delay(1500);
         }
 
         await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
     } catch (e) {
-        console.log("NEWS ERROR:", e);
-        if(e.response?.status === 401) {
-            reply("❌ *API Key එක අවුල්. newsapi.org eke key eka check කරන්න*");
-        } else if(e.response?.status === 429) {
-            reply("❌ *අදට News limit ඉවරයි. හෙට ආයෙ try කරන්න*");
-        } else {
-            reply("❌ *News ගන්න බැරි උනා. Internet check කරන්න*");
-        }
+        console.log("NEWS ERROR:", e.message);
+        reply("❌ *News ගන්න බැරි උනා. Internet check කරන්න හෝ පස්සෙ try කරන්න*");
     }
     break;
 }
+
 
 // ════════════ WEATHER ════════════
 case 'weather': {
