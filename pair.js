@@ -1228,54 +1228,37 @@ ${buildMenuBody(readMore)}
     }
 					
 // ════════════ FORWARD ════════════
-case 'fw': {
+case 'weather': {
     try {
-        const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
-        if (!contextInfo?.quotedMessage) {
-            return reply("📩 *Photo/Video ekata reply karala.fw number,number* \n Ex: `.fw 94763353368`");
-        }
+        let location = body.split(' ').slice(1).join(' ');
+        if (!location) location = 'Colombo'; // namak nathnam Colombo
 
-        const args = body.split(' ');
-        if (!args[1]) return reply("❌ *Namber eka denna*");
+        await socket.sendMessage(sender, { react: { text: '🌤️', key: msg.key } }).catch(() => {});
 
-        const numbers = args[1].split(',');
-        await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+        // wttr.in - free API, key nathiwa weda
+        const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+        const { data } = await axios.get(url, { timeout: 15000 });
 
-        let success = 0;
-        let failed = 0;
+        const current = data.current_condition[0];
+        const today = data.weather[0];
 
-        // මේක තමයි trick එක - quoted message eka thamai forward karanne
-        const messageToForward = {
-            key: {
-                remoteJid: contextInfo.remoteJid,
-                fromMe: false,
-                id: contextInfo.stanzaId,
-                participant: contextInfo.participant
-            },
-            message: contextInfo.quotedMessage
-        };
+        let replyText = `🌍 *${location} Weather* \n\n`;
+        replyText += `🌡️ *Temp*: ${current.temp_C}°C | Feels: ${current.FeelsLikeC}°C\n`;
+        replyText += `☁️ *Sky*: ${current.weatherDesc[0].value}\n`;
+        replyText += `💧 *Humidity*: ${current.humidity}%\n`;
+        replyText += `🌬️ *Wind*: ${current.windspeedKmph} km/h ${current.winddir16Point}\n`;
+        replyText += `👁️ *Visibility*: ${current.visibility} km\n`;
+        replyText += `🌧️ *Rain Chance*: ${today.hourly[0].chanceofrain}%\n\n`;
+        replyText += `📅 *Today*: ${today.maxtempC}°C / ${today.mintempC}°C\n`;
+        replyText += `🌅 *Sunrise*: ${today.astronomy[0].sunrise} 🌇 *Sunset*: ${today.astronomy[0].sunset}`;
 
-        for (let num of numbers) {
-            const targetNumber = num.replace(/[^0-9]/g, '') + '@s.whatsapp.net';
-
-            try {
-                await socket.forwardMessages(targetNumber, [messageToForward], 1);
-                success++;
-                await delay(5000); // 5s - ban avoid karanna
-            } catch (e) {
-                failed++;
-                console.log("FW ERROR for", num, ":", e.message);
-            }
-        }
-
+        await socket.sendMessage(sender, { text: replyText }, { quoted: msg });
         await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-        reply(`✅ *Iwarai*\n\nYapuwa: ${success}\nBari una: ${failed}`);
 
-    } catch (err) {
-        console.log("FW CASE CRASH:", err);
-        reply("❌ *Error una. Console eka check karanna*");
+    } catch (e) {
+        console.log("WEATHER ERROR:", e.message);
+        reply("❌ *City eka hoya ganna bari una*\nEx: `.weather Kandy` `.weather New York`");
     }
-
     break;
 }
 					
