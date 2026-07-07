@@ -1230,18 +1230,16 @@ ${buildMenuBody(readMore)}
 	}		
 		
 // ════════════ NEWS ════════════
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, downloadContentFromMessage } = require('@whiskeysockets/baileys')
-const mongoose = require('mongoose')
-const fs = require('fs')
-const pino = require('pino')
 
 // ========== CONFIG ==========
-const OWNER = '9477XXXXXXXX' // උබේ number එක @ නැතුව දාපන්
+const OWNER = '9477XXXXXXXX' // <-- උබේ number එක @ නැතුව දාපන්
 const PREFIX = '.'
 const MONGO_URL = 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0'
 
 // ========== MONGODB ==========
-mongoose.connect(MONGO_URL).then(() => console.log('✅ MongoDB Connected')).catch(err => console.log(err))
+mongoose.connect(MONGO_URL, { useNewUrlParser: true, useUnifiedTopology: true })
+.then(() => console.log('✅ MongoDB Connected'))
+.catch(err => console.log('❌ Mongo Error:', err))
 
 const autoReplySchema = new mongoose.Schema({
     keyword: { type: String, unique: true, lowercase: true },
@@ -1259,7 +1257,8 @@ const startBot = async () => {
     const socket = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        printQRInTerminal: true
+        printQRInTerminal: true,
+        browser: ['Pro Bot', 'Chrome', '1.0.0']
     })
 
     socket.ev.on('creds.update', saveCreds)
@@ -1267,98 +1266,101 @@ const startBot = async () => {
     socket.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect } = update
         if(connection === 'close') {
-            const reason = new DisconnectReason(lastDisconnect.error)?.output?.statusCode
-            if(reason!== DisconnectReason.loggedOut) startBot()
+            if((lastDisconnect.error)?.output?.statusCode!== DisconnectReason.loggedOut) {
+                startBot()
+            }
         } else if(connection === 'open') {
             console.log('✅ Bot Online')
         }
     })
 
     // ========== MAIN HANDLER ==========
-    socket.ev.on('messages.upsert', async ({ messages }) => {
-        const msg = messages[0]
+    socket.ev.on('messages.upsert', async (m) => {
+        if(!m.messages) return
+        const msg = m.messages[0]
         if(!msg.message || msg.key.fromMe) return
 
         const sender = msg.key.remoteJid
-        const fromMe = sender === OWNER + '@s.whatsapp.net'
-        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || ''
-        const isOwner = sender.includes(OWNER)
+        const isGroup = sender.endsWith('@g.us')
+        const from = isGroup? msg.key.participant : sender
+        const isOwner = from?.includes(OWNER)
+
+        const type = Object.keys(msg.message)[0]
+        const body = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || ''
+
         const reply = (text) => socket.sendMessage(sender, { text }, { quoted: msg })
 
         // ========== COMMANDS ==========
         if(body.startsWith(PREFIX)){
-            const args = body.slice(PREFIX.length).trim().split(' ')
-            const command = args[0].toLowerCase()
+            const args = body.slice(PREFIX.length).trim().split(/ +/)
+            const command = args.shift().toLowerCase()
 
             switch(command) {
                 case 'menu': {
-                    const menu = `
-╭━━━〔 *👑 PRO BOT* 〕━━━╮
-┃
-┃ *🛠️ AUTO REPLY*
-┃ ${PREFIX}add [keyword] [text]
-┃ ${PREFIX}add [keyword] [link]
-┃ Voice ekata reply karala: ${PREFIX}add [keyword]
-┃ ${PREFIX}del [keyword]
-┃ ${PREFIX}list
-┃
-┃ *📊 STATUS*
-┃ ${PREFIX}ping
-┃
-╰━━━━━━━━━━━━━━━━━━━━━━╯
-                    `
-                    reply(menu)
+                    reply(`*👑 PRO BOT MENU*
+
+.add [keyword] [text] - Text add
+.add [keyword] [link] - Link add
+Voice ekata reply:.add [keyword]
+.del [keyword] - Delete
+.list - All keywords
+.ping - Speed`)
                     break;
                 }
 
                 case 'add': {
-                    if(!isOwner) return reply("❌ *Owner only*")
-                    const keyword = args[1]?.toLowerCase()
+                    if(!isOwner) return reply("❌ Owner only")
+                    const keyword = args[0]?.toLowerCase()
                     if(!keyword) return reply(`Ex: *${PREFIX}add hi hello*`)
 
-                    const quoted = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage
+                    const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage
                     let data = { keyword, type: 'text', content: '' }
 
-                    // Voice
-                    if(quoted?.audioMessage) {
-                        const stream = await downloadContentFromMessage(quoted.audioMessage, 'audio')
-                        let buffer = Buffer.from([])
-                        for await(const chunk of stream) buffer = Buffer.concat([buffer, chunk])
-                        const file = `./database/voice/${keyword}.ogg`
-                        fs.writeFileSync(file, buffer)
-                        data.type = 'voice'
-                        data.content = file
-                    }
-                    // Link
-                    else if(args[2]?.startsWith('http')) {
-                        data.type = 'link'
-                        data.content = args.slice(2).join(' ')
-                    }
-                    // Text
-                    else {
-                        const text = args.slice(2).join(' ') || quoted?.conversation || quoted?.extendedTextMessage?.text
-                        if(!text) return reply("❌ *Text/Link/Voice dena*")
-                        data.content = text
-                    }
+                    try {
+                        // Voice
+                        if(quoted?.audioMessage) {
+                            const stream = await downloadContentFromMessage(quoted.audioMessage, 'audio')
+                            let buffer = Buffer.from([])
+                            for await(const chunk of stream) buffer = Buffer.concat([buffer, chunk])
+                            const file = `./database/voice/${keyword}.ogg`
+                            fs.writeFileSync(file, buffer)
+                            data.type = 'voice'
+                            data.content = file
+                        }
+                        // Link
+                        else if(args[1]?.startsWith('http')) {
+                            data.type = 'link'
+                            data.content = args.slice(1).join(' ')
+                        }
+                        // Text
+                        else {
+                            const text = args.join(' ') || quoted?.conversation || quoted?.extendedTextMessage?.text
+                            if(!text) return reply("❌ Text/Link/Voice dena")
+                            data.content = text
+                        }
 
-                    await AutoReply.findOneAndUpdate({ keyword }, data, { upsert: true })
-                    await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } })
-                    reply(`✅ *Added!*\n*Keyword*: ${keyword}\n*Type*: ${data.type}`)
+                        await AutoReply.findOneAndUpdate({ keyword }, data, { upsert: true, new: true })
+                        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } })
+                        reply(`✅ *Added!*\nKeyword: ${keyword}\nType: ${data.type}`)
+                    } catch(e) {
+                        console.log(e)
+                        reply("❌ Error: " + e.message)
+                    }
                     break;
                 }
 
                 case 'del': {
-                    if(!isOwner) return reply("❌ *Owner only*")
-                    const keyword = args[1]?.toLowerCase()
+                    if(!isOwner) return reply("❌ Owner only")
+                    const keyword = args[0]?.toLowerCase()
                     if(!keyword) return reply(`Ex: *${PREFIX}del hi*`)
                     const del = await AutoReply.findOneAndDelete({ keyword })
-                    reply(del? `✅ *${keyword} deleted*` : `❌ *Not found*`)
+                    reply(del? `✅ *${keyword} deleted*` : `❌ Not found`)
                     break;
                 }
 
                 case 'list': {
                     const all = await AutoReply.find()
-                    if(all.length === 0) return reply("❌ *Empty*")
+                    if(all.length === 0) return reply("❌ Empty")
                     let list = "*📋 Auto Reply List*\n\n"
                     all.forEach((x,i) => list += `${i+1}. *${x.keyword}* - ${x.type}\n`)
                     reply(list)
@@ -1367,9 +1369,9 @@ const startBot = async () => {
 
                 case 'ping': {
                     const start = Date.now()
-                    const msg = await reply("Pong!")
+                    const ms = await reply("Pong!")
                     const end = Date.now()
-                    await socket.sendMessage(sender, { text: `*Speed*: ${end - start}ms` }, { quoted: msg })
+                    await socket.sendMessage(sender, { text: `*Speed*: ${end - start}ms` }, { quoted: ms })
                     break;
                 }
             }
@@ -1378,6 +1380,7 @@ const startBot = async () => {
         // ========== AUTO REPLY ==========
         else {
             const text = body.toLowerCase().trim()
+            if(text.length === 0) return;
             const auto = await AutoReply.findOne({ keyword: text })
             if(auto) {
                 await socket.sendMessage(sender, { react: { text: '🤖', key: msg.key } })
