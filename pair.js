@@ -1225,9 +1225,61 @@ ${buildMenuBody(readMore)}
       }, { quoted: msg });
 
       break;
+	}		
+		
+// ════════════ NEWS ════════════
+case 'news': {
+    try {
+        const topic = body.split(' ').slice(1).join(' ') || 'Sri Lanka';
+        await socket.sendMessage(sender, { react: { text: '📰', key: msg.key } }).catch(() => {});
+
+        const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(topic)} AND Sri Lanka&language=en&sortBy=publishedAt&pageSize=5&apiKey=YOUR_API_KEY`;
+        const { data } = await axios.get(url, { timeout: 15000 });
+
+        if(data.articles.length === 0) {
+            return reply(`❌ *${topic} gana අලුත් News හොයාගන්න බැරි උනා*`);
+        }
+
+        // Top 5 News tika loop karanawa
+        for(let i = 0; i < data.articles.length; i++) {
+            const a = data.articles[i];
+            const date = new Date(a.publishedAt).toLocaleString('si-LK', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: 'short'
+            });
+
+            let newsText = `📰 *${i+1}. ${a.title}*\n\n`;
+            newsText += `📝 ${a.description || 'විස්තරයක් නැත'}\n\n`;
+            newsText += `🗞️ *Source*: ${a.source.name}\n`;
+            newsText += `⏰ *කාලය*: ${date}\n`;
+            newsText += `🔗 *Read More*: ${a.url}`;
+
+            // Photo eka tiyanawanam photo ekka ewannawa
+            if(a.urlToImage) {
+                await socket.sendMessage(sender, {
+                    image: { url: a.urlToImage },
+                    caption: newsText
+                }, { quoted: msg });
+            } else {
+                // Photo nathnam text witharak
+                await socket.sendMessage(sender, { text: newsText }, { quoted: msg });
+            }
+
+            await delay(1500); // Spam wenna nathi wenna 1.5s delay
+        }
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.log("NEWS ERROR:", e.message);
+        reply("❌ *News ගන්න බැරි උනා. API Key එක හරිද බලන්න*");
     }
-					
-// ════════════ FORWARD ════════════
+    break;
+}
+
+// ════════════ WEATHER ════════════
 case 'weather': {
     try {
         let location = body.split(' ').slice(1).join(' ');
