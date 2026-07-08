@@ -1273,6 +1273,44 @@ ${buildMenuBody(readMore)}
 		
 // ════════════ IMAGINE ════════════
 
+case 'time': {
+    try {
+        let location = body.split(' ').slice(1).join(' ');
+        
+        // පරිශීලකයා රටක්/නගරයක් දුන්නේ නැත්නම් default ලංකාවේ වෙලාව පෙන්වන්න
+        if (!location) location = 'Asia/Colombo'; 
+
+        await socket.sendMessage(sender, { react: { text: '🕒', key: msg.key } }).catch(() => {});
+
+        // World Time API - key එකක් නැතුව වැඩ කරන සරල API එකක්
+        // Note: මේකට Area/City විදිහට දෙන්න ඕනේ (Ex: Asia/Colombo, Europe/London, America/New_York)
+        const url = `http://worldtimeapi.org/api/timezone/${location}`;
+        const { data } = await axios.get(url, { timeout: 15000 });
+
+        // API එකෙන් ලැබෙන ISO Date Time එක (2026-07-08T17:23:35...) format කරගැනීම
+        const datetimeStr = data.datetime; // e.g. "2026-07-08T17:23:35.123456+05:30"
+        const datePart = datetimeStr.split('T')[0]; // 2026-07-08
+        const timePart = datetimeStr.split('T')[1].split('.')[0]; // 17:23:35
+
+        // දවස් ටික සිංහලෙන් දාන්න array එකක්
+        const daysInSinhala = ['ඉරිදා', 'සඳුදා', 'අඟහරුවාදා', 'බදාදා', 'බ්‍රහස්පතින්දා', 'සිකුරාදා', 'සෙනසුරාදා'];
+        const dayOfWeek = daysInSinhala[data.day_of_week];
+
+        let replyText = `🌍 *${data.timezone} වේලාව* \n\n`;
+        replyText += `🕒 *වේලාව*: ${timePart}\n`;
+        replyText += `📅 *දිනය*: ${datePart}\n`;
+        replyText += `📆 *දිනය*: ${dayOfWeek}\n`;
+        replyText += `🌐 *Timezone*: ${data.abbreviation} (UTC ${data.utc_offset})`;
+
+        await socket.sendMessage(sender, { text: replyText }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.log("TIME ERROR:", e.message);
+        reply("❌ *ස්ථානය සොයාගත නොහැකි විය*\n\n💡 *Tip:* කරුණාකර `Area/City` ආකෘතියෙන් ලබාදෙන්න.\nEx: `.time Asia/Colombo`\n`.time Europe/London`\n`.time America/New_York`保持");
+    }
+    break;
+}
 
 // ════════════ WEATHER ════════════
 case 'weather': {
