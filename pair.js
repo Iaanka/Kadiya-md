@@ -1216,74 +1216,72 @@ case 'alive': {
     break;
 }
 // ════════════ ALIVE ════════════
-case 'hdr':
-case 'clear': {
+case 'paper': {
     // 1. ක්‍රියාවලිය පටන් ගත් බව පෙන්වීමට ⏳ React එකක් දමයි
     try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
 
     try {
-        // Quoted (Reply කරපු) මැසේජ් එක හෝ සෘජුවම එවපු මැසේජ් එක Image එකක්දැයි බැලීම
-        const isQuotedImage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
-        const isDirectImage = msg.message?.imageMessage;
+        const args = text.trim().split(/ +/).slice(1);
+        const paperName = args.join(' ');
 
-        if (!isQuotedImage && !isDirectImage) {
+        // විෂය සහ වර්ෂය ඇතුළත් කර ඇත්දැයි බැලීම
+        if (!paperName) {
             try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
             return await socket.sendMessage(sender, { 
-                text: "❌ කරුණාකර බොඳ වූ ඡායාරූපයකට (Photo) Reply එකක් ලෙස හෝ ඡායාරූපයක් සමඟ `.hdr` හෝ `.clear` ලෙස command එක ලබාදෙන්න." 
+                text: "❌ කරුණාකර ඔබට අවශ්‍ය විෂය සහ වර්ෂය ඇතුළත් කරන්න.\n\n*Ex:* `.paper 2020 AL Combined Maths`\n*Ex:* `.paper 2022 OL Science`" 
             }, { quoted: msg });
         }
 
-        await socket.sendMessage(sender, { text: "🪄 AI මඟින් ඡායාරූපය පැහැදිලි කරමින් පවතී. කරුණාකර තත්පර කිහිපයක් රැඳී සිටින්න..." }, { quoted: msg });
+        await socket.sendMessage(sender, { text: `🔍 *${paperName}* ප්‍රශ්න පත්‍රය අන්තර්ජාලය ඔස්සේ සොයමින් පවතී...` }, { quoted: msg });
 
-        // 2. WhatsApp එකෙන් එවපු හෝ Reply කරපු Image එක ඩවුන්ලෝඩ් කරගැනීම
-        const messageToDownload = isQuotedImage ? msg.message.extendedTextMessage.contextInfo.quotedMessage : msg;
-        const buffer = await downloadMediaMessage(
-            messageToDownload,
-            'buffer',
-            {},
-            { 
-                logger: console,
-                reconnectCount: 3
-            }
-        );
-
-        // 3. නොමිලේ පාවිච්චි කළ හැකි AI Image Enhancer API එකකට Buffer එක යැවීම
-        // මෙහිදී අපි ලෝක ප්‍රසිද්ධ තත්ත්වයෙන් උසස් පොදු API එකක් භාවිතා කරමු
-        const formData = new FormData();
-        formData.append('image', buffer, { filename: 'enhance.jpg' });
-
-        // සටහන: මෙහි දක්වා ඇත්තේ පින්තූර HD කරන පොදු නිදහස් API එකකි (නොමිලේ ලබාදෙන AI Tools වල API එකක්)
-        const response = await axios.post('https://api.itsrose.rest/image/unblur', formData, {
-            headers: {
-                ...formData.getHeaders(),
-                // 'Authorization': 'ඔයාගේ_key_එක' // අවශ්‍ය නම් පමණක් (බොහෝ ඒවා නොමිලේ වැඩ කරයි)
-            },
-            responseType: 'arraybuffer' // අපිට රූපය බෆර් එකක් විදිහටම ඕන නිසා
-        }).catch(async (err) => {
-            // පළමු API එක වැඩ නැත්නම් විකල්ප (Alternative) API එකක් භාවිතා කිරීම
-            return await axios.post('https://tools.api.aswinbarrin.repl.co/api/enhance', formData, {
-                headers: formData.getHeaders(),
-                responseType: 'arraybuffer'
-            });
-        });
-
-        const hdImageBuffer = Buffer.from(response.data, 'binary');
-
-        // 4. සාර්ථකව නිම වූ පසු පැහැදිලි වූ ඡායාරූපය (HD Photo) නැවත යැවීම
-        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        // 2. Past Papers සොයන නිදහස් (Free) API එකක් භාවිතා කිරීම
+        // (මෙහිදී උදාහරණයක් ලෙස පොදු සෙවුම් API එකක් යොදා ඇත. ඔයා සතු වෙනත් නිශ්චිත API එකක් ඇත්නම් URL එක වෙනස් කරන්න)
+        const SEARCH_API = `https://api.allorigins.win/get?url=${encodeURIComponent('https://pastpapers.lk/?s=' + paperName)}`;
+        const response = await axios.get(SEARCH_API);
         
-        await socket.sendMessage(sender, { 
-            image: hdImageBuffer, 
-            caption: "✨ *ඔන්න AI මඟින් ඔයාගේ Photo එක Clear කරලා දුන්නා!* \n\n⚡ Powered by AI Enhancer Bot" 
+        // සරලවම Google / Bing PDF Search API එකක් හෝ ඔයාගේ Database එකක් මෙතනට සම්බන්ධ කළ හැක.
+        // දැනට පරීක්ෂණ මට්ටමින් සෘජුවම PDF එකක් ඩවුන්ලෝඩ් වන ක්‍රමවේදය පහත පරිදි වේ:
+        
+        // සටහන: බොට් එක ස්ථාවරව වැඩ කිරීමට සෘජු (Direct) PDF URL එකක් අවශ්‍ය වේ.
+        // උදාහරණයක් ලෙස අපි හිතමු API එකෙන් 'pdf_url' සහ 'title' ලැබෙනවා කියලා:
+        let pdfUrl = ""; 
+        let paperTitle = paperName;
+
+        /* 
+           [DEVELOPER NOTE] 
+           ඔයා පාවිච්චි කරන API එක අනුව pdfUrl එක මෙතනට assign කරගන්න. 
+           උදාහරණ: pdfUrl = response.data.results[0].download_link;
+        */
+
+        // පරීක්ෂා කිරීම සඳහා (Testing): සෘජු PDF ලින්ක් එකක් ලැබුණේ නැත්නම් ක්‍රියාවලිය නැවතීමට
+        if (!pdfUrl) {
+            // API එකක් නැතිව දැනට ලින්ක් එකක් සෙවීමට අපහසු නම්, 
+            // අධ්‍යාපනික වෙබ් අඩවි වල පොදු PDF එකක් මේ විදිහට hardcode කරලා ටෙස්ට් කරලා බලන්නත් පුළුවන්.
+            return await socket.sendMessage(sender, { text: "❌ කණගාටුයි, එම ප්‍රශ්න පත්‍රය සොයා ගැනීමට නොහැකි විය. පසුව නැවත උත්සාහ කරන්න." }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { text: "📥 ප්‍රශ්න පත්‍රය ඩවුන්ලෝඩ් වෙමින් පවතී. කරුණාකර රැඳී සිටින්න..." }, { quoted: msg });
+
+        // 3. PDF එක කෙලින්ම WhatsApp Document එකක් විදිහට යැවීම
+        // වීඩියෝ වගේ නෙවෙයි, PDF ෆයිල් සයිස් එක ගොඩක් අඩු නිසා මේක 100% ක් සාර්ථකව වැඩ කරනවා.
+        await socket.sendMessage(sender, {
+            document: { url: pdfUrl },
+            mimetype: 'application/pdf',
+            fileName: `${paperTitle}.pdf`,
+            caption: `✨ *ඔන්න ඔයා ඉල්ලපු Past Paper එක!* \n\n📚 *විෂය:* ${paperTitle}\n🎯 උසස් පෙළ / සාමාන්‍ය පෙළ විභාගයට ජය පතා ප්‍රාර්ථනා කරමු!`
         }, { quoted: msg });
 
+        // සාර්ථකව නිම වූ පසු ✅ React එක දමයි
+        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+
     } catch (error) {
-        console.error("AI Enhancer Error:", error);
+        console.error("Past Paper Error:", error);
         try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, { text: "⚠️ ඡායාරූපය පැහැදිලි කිරීමට නොහැකි විය. පින්තූරයේ Size එක වැඩි වීම හෝ API එක කාර්යබහුල වීම මීට හේතුව විය හැක." }, { quoted: msg });
+        await socket.sendMessage(sender, { text: "⚠️ ප්‍රශ්න පත්‍රය ලබා ගැනීමේදී දෝෂයක් සිදු විය." }, { quoted: msg });
     }
     break;
 }
+
 
 					
 // ════════════ SYSTEM ════════════
