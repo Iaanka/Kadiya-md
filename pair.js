@@ -1216,107 +1216,75 @@ case 'alive': {
     break;
 }
 // ════════════ ALIVE ════════════
-case 'movie': {
-    try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_){}
+case 'hdr':
+case 'clear': {
+    // 1. ක්‍රියාවලිය පටන් ගත් බව පෙන්වීමට ⏳ React එකක් දමයි
+    try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
 
     try {
-        const args = text.trim().split(/ +/).slice(1);
-        const movieName = args.join(' ');
+        // Quoted (Reply කරපු) මැසේජ් එක හෝ සෘජුවම එවපු මැසේජ් එක Image එකක්දැයි බැලීම
+        const isQuotedImage = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+        const isDirectImage = msg.message?.imageMessage;
 
-        if (!movieName) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_){}
-            return await socket.sendMessage(sender, { text: "❌ Movie එකේ නම දෙන්න.\n\n*Ex:* `.movie paththini`" }, { quoted: msg });
+        if (!isQuotedImage && !isDirectImage) {
+            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+            return await socket.sendMessage(sender, { 
+                text: "❌ කරුණාකර බොඳ වූ ඡායාරූපයකට (Photo) Reply එකක් ලෙස හෝ ඡායාරූපයක් සමඟ `.hdr` හෝ `.clear` ලෙස command එක ලබාදෙන්න." 
+            }, { quoted: msg });
         }
 
-        await socket.sendMessage(sender, { text: `🔍 *${movieName}* search කරනවා...` }, { quoted: msg });
+        await socket.sendMessage(sender, { text: "🪄 AI මඟින් ඡායාරූපය පැහැදිලි කරමින් පවතී. කරුණාකර තත්පර කිහිපයක් රැඳී සිටින්න..." }, { quoted: msg });
 
-        // 1. SEARCH API
-        const searchRes = await axios.get(`https://nntech-free-sinhalasub-search-api.vercel.app/api/search?text=${encodeURIComponent(movieName)}`, {timeout: 15000});
+        // 2. WhatsApp එකෙන් එවපු හෝ Reply කරපු Image එක ඩවුන්ලෝඩ් කරගැනීම
+        const messageToDownload = isQuotedImage ? msg.message.extendedTextMessage.contextInfo.quotedMessage : msg;
+        const buffer = await downloadMediaMessage(
+            messageToDownload,
+            'buffer',
+            {},
+            { 
+                logger: console,
+                reconnectCount: 3
+            }
+        );
 
-        let results = searchRes.data?.results || searchRes.data?.data || searchRes.data || []
+        // 3. නොමිලේ පාවිච්චි කළ හැකි AI Image Enhancer API එකකට Buffer එක යැවීම
+        // මෙහිදී අපි ලෝක ප්‍රසිද්ධ තත්ත්වයෙන් උසස් පොදු API එකක් භාවිතා කරමු
+        const formData = new FormData();
+        formData.append('image', buffer, { filename: 'enhance.jpg' });
 
-        if(!Array.isArray(results) || results.length === 0){
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_){}
-            return await socket.sendMessage(sender, { text: `❌ "${movieName}" කියලා movie එකක් හොයාගන්න බැරි උනා.` }, { quoted: msg });
-        }
-
-        let listMsg = `*NNTECH MOVIE SEARCH RESULTS*\n\n`;
-
-        results.slice(0, 10).forEach((v, i) => {
-            const title = v.title || v.name || v.movie || `Result ${i+1}`
-            listMsg += `*${i+1}.* ${title}\n`;
+        // සටහන: මෙහි දක්වා ඇත්තේ පින්තූර HD කරන පොදු නිදහස් API එකකි (නොමිලේ ලබාදෙන AI Tools වල API එකක්)
+        const response = await axios.post('https://api.itsrose.rest/image/unblur', formData, {
+            headers: {
+                ...formData.getHeaders(),
+                // 'Authorization': 'ඔයාගේ_key_එක' // අවශ්‍ය නම් පමණක් (බොහෝ ඒවා නොමිලේ වැඩ කරයි)
+            },
+            responseType: 'arraybuffer' // අපිට රූපය බෆර් එකක් විදිහටම ඕන නිසා
+        }).catch(async (err) => {
+            // පළමු API එක වැඩ නැත්නම් විකල්ප (Alternative) API එකක් භාවිතා කිරීම
+            return await axios.post('https://tools.api.aswinbarrin.repl.co/api/enhance', formData, {
+                headers: formData.getHeaders(),
+                responseType: 'arraybuffer'
+            });
         });
 
-        listMsg += `\n⬇️ Download කරන්න number එක reply කරන්න\n*Ex:* 1`;
+        const hdImageBuffer = Buffer.from(response.data, 'binary');
 
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-        const sentMsg = await socket.sendMessage(sender, { text: listMsg }, { quoted: msg });
-
-        // 3. USER REPLY WAIT
-        const handler = async (m) => {
-            const msg2 = m.messages[0]
-            if(!msg2?.message || msg2.key.remoteJid!== sender) return
-            if(msg2.message.extendedTextMessage?.contextInfo?.stanzaId!== sentMsg.key.id) return
-
-            socket.ev.off('messages.upsert', handler) // 1 පාරයි
-
-            const choice = msg2.message.conversation || msg2.message.extendedTextMessage?.text
-            const index = parseInt(choice) - 1
-
-            if(isNaN(index) || index < 0 || index >= results.length) return
-
-            try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg2.key } }); } catch (_){}
-            await socket.sendMessage(sender, { text: `⬇️ Download link එක ගන්නවා...` }, { quoted: msg2 });
-
-            // 4. DOWNLOAD API
-            const selected = results[index]
-            const downloadUrl = selected.url || selected.link || selected.download
-
-            const dlRes = await axios.get(`https://nntech-free-sinhalasub-dl-api.vercel.app/api/download?url=${encodeURIComponent(downloadUrl)}`, {timeout: 20000});
-
-            const videoUrl = dlRes.data?.url || dlRes.data?.download || dlRes.data?.result || dlRes.data?.link
-
-            if(!videoUrl){
-                try { await socket.sendMessage(sender, { react: { text: '❌', key: msg2.key } }); } catch (_){}
-                return await socket.sendMessage(sender, { text: "❌ Download link එක හොයාගන්න බැරි උනා\nAPI Error: " + JSON.stringify(dlRes.data) }, { quoted: msg2 });
-            }
-
-            // 5. FILE SIZE CHECK
-            let fileSize = 0, sizeMB = "Unknown"
-            try {
-                const head = await axios.head(videoUrl, {timeout: 10000})
-                fileSize = parseInt(head.headers['content-length']) || 0
-                sizeMB = (fileSize / 1024 / 1024).toFixed(2)
-            } catch(e){}
-
-            const MAX_SIZE = 100 * 1024 * 1024
-
-            if(fileSize > MAX_SIZE){
-                try { await socket.sendMessage(sender, { react: { text: '📎', key: msg2.key } }); } catch (_){}
-                await socket.sendMessage(sender, {
-                    text: `*${selected.title || selected.name}*\n\n⚠️ File එක ${sizeMB}MB. WhatsApp limit 100MB.\n\n*Download Link:* ${videoUrl}`
-                }, { quoted: msg2 });
-            } else {
-                try { await socket.sendMessage(sender, { react: { text: '📤', key: msg2.key } }); } catch (_){}
-                await socket.sendMessage(sender, {
-                    video: { url: videoUrl },
-                    caption: `*${selected.title || selected.name}*\nSize: ${sizeMB}MB\n\nPowered by NNTECH`,
-                    mimetype: 'video/mp4'
-                }, { quoted: msg2 });
-            }
-
-            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg2.key } }); } catch (_){}
-
-        }
-        socket.ev.on('messages.upsert', handler)
+        // 4. සාර්ථකව නිම වූ පසු පැහැදිලි වූ ඡායාරූපය (HD Photo) නැවත යැවීම
+        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        
+        await socket.sendMessage(sender, { 
+            image: hdImageBuffer, 
+            caption: "✨ *ඔන්න AI මඟින් ඔයාගේ Photo එක Clear කරලා දුන්නා!* \n\n⚡ Powered by AI Enhancer Bot" 
+        }, { quoted: msg });
 
     } catch (error) {
-        console.error("Movie Error:", error.response?.data || error.message);
-        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_){}
-        await socket.sendMessage(sender, { text: `⚠️ Error: ${error.message}\nAPI එක down ද? ටිකකින් try කරන්න.` }, { quoted: msg });
+        console.error("AI Enhancer Error:", error);
+        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+        await socket.sendMessage(sender, { text: "⚠️ ඡායාරූපය පැහැදිලි කිරීමට නොහැකි විය. පින්තූරයේ Size එක වැඩි වීම හෝ API එක කාර්යබහුල වීම මීට හේතුව විය හැක." }, { quoted: msg });
     }
     break;
 }
+
 					
 // ════════════ SYSTEM ════════════
 
