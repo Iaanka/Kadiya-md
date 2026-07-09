@@ -2227,8 +2227,7 @@ case 'fancytext': {
 
 // ════════════ OWNER ════════════
 
-                case 'owner': {
-				case 'maliya': {	
+                case 'owner': {	
     const ownerNum = '+94763353368';
     const ownerName = 'お 𝗜ꜱᴀɴᴋᴀ ࣪𖤐.ᐟ';
     
