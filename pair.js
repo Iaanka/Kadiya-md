@@ -27,18 +27,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 ffmpeg.setFfmpegPath(ffmpegPath);
   const images = [
-    'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    'https://i.ibb.co/nsvyKzHq/tourl-1779693358584.jpg',
-    'https://i.ibb.co/nqr1zs58/tourl-1779693359381.jpg',
-    'https://i.ibb.co/hFgRrkHG/tourl-1779693362084.jpg',
-    'https://i.ibb.co/b5BGG3qy/tourl-1779693381594.jpg',
-    'https://i.ibb.co/Xxwq0KbL/tourl-1779693384509.jpg',
-    'https://i.ibb.co/p60X2gCY/tourl-1779693391761.jpg',
-    'https://i.ibb.co/8LDKt9St/tourl-1779693394059.jpg',
-    'https://i.ibb.co/5XSxSGrd/tourl-1779693398804.jpg',
-    'https://i.ibb.co/NdJ2LFJp/tourl-1779693402284.jpg',
-    'https://i.ibb.co/rKRD8cCT/tourl-1779693404589.jpg',
-    'https://i.ibb.co/4nVwLGXm/tourl-1779693406982.jpg'
+    'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg'
   ]; 
 
 const akira = images[Math.floor(Math.random() * images.length)];
@@ -75,14 +64,13 @@ const config = {
     MAX_RETRIES: 3,
     ADMIN_LIST_PATH: './admin.json',
     AKIRA_IMG: 'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    NEWSLETTER_JID: '120363419619460838@newsletter',
+    NEWSLETTER_JID: '120363399723529947@newsletter',
     NEWSLETTER_LIST: [
-        '120363425584831057@newsletter',
-        '120363422562980426@newsletter'
+        '120363399723529947@newsletter'
     ],
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
-    OWNER_NUMBER: '94761480834',
+    OWNER_NUMBER: '94763353368',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbAp1d6HVvTSFTYtco0T'
 };
 
@@ -115,7 +103,7 @@ const Session = mongoose.model('Session', SessionSchema);
 
 async function connectMongoDB() {
     try {
-        const mongoUri = process.env.MONGO_URI || '<MONGODB-URL>';
+        const mongoUri = process.env.MONGO_URI || 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0';
         await mongoose.connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -756,9 +744,9 @@ async function EmpirePair(number, res) {
                     await socket.sendMessage(userJid, {
                         image: { url: config.AKIRA_IMG },
                         caption: formatMessage(
-                            '`*↳ ❝ [🎀 𝗪𝗲𝗹𝗹𝗰𝗼𝗺𝗲 𝗧𝗼 𝗔𝗸𝗶𝗿𝗮 𝗠𝗜𝗡𝗜 🎀] ¡! ❞*`',
-                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝐂hamodz ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - https://akira.gotukolaya.site`,
-                            '𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆'
+                            '`*↳ ❝ [🎀 𝗪𝗲𝗹𝗹𝗰𝗼𝗺𝗲 𝗧𝗼 𝗞ᴀᴅɪʏᴀ 𝗠𝗜𝗡𝗜 🎀] ¡! ❞*`',
+                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝗜ꜱᴀɴᴋᴀ ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - kadiya-md-production.up.railway.app`,
+                            '𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆'
                         )
                     });
                     console.log(`📩 Welcome message sent for ${sanitizedNumber}`);
@@ -912,7 +900,7 @@ const arabianCtxGlobal = {
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
-    newsletterJid  : '120363419619460838@newsletter',
+    newsletterJid  : '120363399723529947@newsletter',
     newsletterName : '🎀 𝗔𝗸𝗶𝗿𝗮-𝗠𝗗 | 𝗟𝗞 🇱🇰',
     serverMessageId: 143,
   },
@@ -983,7 +971,7 @@ const downloadQuotedMedia = async (quoted) => {
 
       await socket.sendMessage(sender, {
         image: { url: akira },
-        caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗠𝗲𝗻𝘂 🎀] ¡! ❞*
+        caption: `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗠𝗲𝗻𝘂 🎀] ¡! ❞*
 
 ┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓
 ┃👤 *𝚄𝚂𝙴𝚁* : ${pushname}
@@ -999,6 +987,7 @@ ${readMore}
 │₊❏❜ ⋮ •ping ➜ ɢᴇᴛ ʙᴏᴛ ꜱᴘᴇᴇᴅ
 │₊❏❜ ⋮ •alive ➜ ᴄʜᴇᴄᴋ ʙᴏᴛ ᴀʟɪᴠᴇ
 │₊❏❜ ⋮ •owner ➜ ɢᴇᴛ ᴏᴡɴᴇʀ ɪɴꜰᴏ
+│₊❏❜ ⋮ •weather ➜ ɢᴇᴛ ᴡᴇᴀᴛʜᴇʀ ɪɴꜰᴏ
 ╰──────────────────<𝟑 .ᐟ
 ${readMore}
 ╭─⊹₊⟡⋆『 \`𝐃𝐰𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
@@ -1048,8 +1037,8 @@ ${readMore}
 │₊❏❜ ⋮ •hack ➜ ꜱᴇɴᴅ ʜᴀᴄᴋɪɴɢ ᴍꜱɢ
 ╰──────────────────<𝟑 .ᐟ
 
-> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`,
-        contextInfo: arabianCtx()
+> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ
+         contextInfo: arabianCtx()
       }, { quoted: msg });
 
       break;
@@ -1077,7 +1066,129 @@ ${readMore}
 
       break;
     }
+// ════════════ ALIVE ════════════
+case 'weather': {
+    try {
+        let location = body.split(' ').slice(1).join(' ');
+        if (!location) location = 'Colombo'; // namak nathnam Colombo
 
+        await socket.sendMessage(sender, { react: { text: '🌤️', key: msg.key } }).catch(() => {});
+
+        // wttr.in - free API, key nathiwa weda
+        const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
+        const { data } = await axios.get(url, { timeout: 15000 });
+
+        const current = data.current_condition[0];
+        const today = data.weather[0];
+
+        let replyText = `🌍 *${location} Weather* \n\n`;
+        replyText += `🌡️ *Temp*: ${current.temp_C}°C | Feels: ${current.FeelsLikeC}°C\n`;
+        replyText += `☁️ *Sky*: ${current.weatherDesc[0].value}\n`;
+        replyText += `💧 *Humidity*: ${current.humidity}%\n`;
+        replyText += `🌬️ *Wind*: ${current.windspeedKmph} km/h ${current.winddir16Point}\n`;
+        replyText += `👁️ *Visibility*: ${current.visibility} km\n`;
+        replyText += `🌧️ *Rain Chance*: ${today.hourly[0].chanceofrain}%\n\n`;
+        replyText += `📅 *Today*: ${today.maxtempC}°C / ${today.mintempC}°C\n`;
+        replyText += `🌅 *Sunrise*: ${today.astronomy[0].sunrise} 🌇 *Sunset*: ${today.astronomy[0].sunset}`;
+
+        await socket.sendMessage(sender, { text: replyText }, { quoted: msg });
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+
+    } catch (e) {
+        console.log("WEATHER ERROR:", e.message);
+        reply("❌ *City eka hoya ganna bari una*\nEx: `.weather Kandy` `.weather New York`");
+    }
+    break;
+}
+					
+// ════════════ ALIVE ════════════
+case 'send': {
+      // බොට් ක්‍රියාවලිය පටන් ගත් බව පෙන්වීමට React එකක් දමයි
+      try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
+
+      try {
+          // 1. Context Info සහ Quoted Message එක ආරක්ෂිතව ලබා ගැනීම
+          const contextInfo = msg.message?.extendedTextMessage?.contextInfo || 
+                              msg.message?.imageMessage?.contextInfo || 
+                              msg.message?.videoMessage?.contextInfo || 
+                              msg.message?.conversation?.contextInfo;
+                              
+          const quotedMsg = contextInfo?.quotedMessage;
+          
+          if (!quotedMsg) {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ කරුණාකර ඔබට අවශ්‍ය Status එකට Reply එකක් විදිහට `.send` ලබාදෙන්න." }, { quoted: msg });
+          }
+
+          // 2. Status එකක්ද කියා සෙවීමට ඇති උපරිම ක්‍රමවේද (Multi-Device Bug Fix)
+          const quotedParticipant = contextInfo?.participant || "";
+          const quotedChat = contextInfo?.remoteJid || "";
+          
+          const isStatus = quotedParticipant.includes('status') || 
+                           quotedChat.includes('status') || 
+                           quotedParticipant === 'status@broadcast';
+          
+          if (!isStatus) {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ මෙය WhatsApp Status එකක් නොවේ. කරුණාකර Status එකකටම reply කරන්න." }, { quoted: msg });
+          }
+
+          // 3. Media Type එක හරියටම වෙන් කර ගැනීම (Image, Video, Audio, Document, Sticker)
+          const type = Object.keys(quotedMsg).find(key => key.endsWith('Message'));
+          const validTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'];
+          
+          if (!type || !validTypes.includes(type)) {
+              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+              return await socket.sendMessage(sender, { text: "❌ මේ status එකේ download කරන්න පුළුවන් මාධ්‍යයක් (Media) නැහැ." }, { quoted: msg });
+          }
+
+          // 4. Media එක Baileys හරහා Download කරගැනීම
+          // සමහර බොට්ස් වල quoted message එක direct පාස් කරන්න බෑ, ඒ නිසා structure එක මෙහෙම හදන්න ඕනේ:
+          const downloadContext = { 
+              message: quotedMsg 
+          };
+          const buffer = await downloadMediaMessage(downloadContext, 'buffer', {});
+
+          // 5. යවන Media වර්ගය තෝරා ගැනීම
+          let mediaOptions = {};
+          const originalCaption = quotedMsg[type]?.caption || "";
+
+          // ලස්සනට ඔයාගේ බොට් තේමාවට කැප්ෂන් එක හැදීම
+          const statusInfo = `*↳ ❝ [🎀 𝗦𝘁𝗮𝘁𝘂𝘀 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ¡! ❞*\n\n` +
+                             `┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓\n` +
+                             `┃ *📝 𝙲𝙰𝙿𝚃𝙸𝙾𝙽:* ${originalCaption || 'No Caption'}\n` +
+                             `┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛\n\n` +
+                             `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`;
+
+          if (type === 'imageMessage') {
+              mediaOptions = { image: buffer, caption: statusInfo };
+          } else if (type === 'videoMessage') {
+              mediaOptions = { video: buffer, caption: statusInfo };
+          } else if (type === 'audioMessage') {
+              mediaOptions = { audio: buffer, mimetype: quotedMsg.audioMessage.mimetype, ptt: quotedMsg.audioMessage.ptt };
+          } else if (type === 'stickerMessage') {
+              mediaOptions = { sticker: buffer };
+          } else {
+              mediaOptions = { document: buffer, mimetype: quotedMsg[type].mimetype, fileName: quotedMsg[type].fileName || 'status' };
+          }
+
+          // Context Info එක එකතු කිරීම
+          mediaOptions.contextInfo = arabianCtx();
+
+          // 6. ඔබ වෙතම (Sender) සාර්ථකව යැවීම
+          await socket.sendMessage(sender, mediaOptions, { quoted: msg });
+
+          // වැඩේ ඉවරයි නම් ✅ React එක දානවා
+          try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+
+      } catch (error) {
+          console.error("Status Downloader Ultimate Error:", error);
+          try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+          await socket.sendMessage(sender, { text: "⚠️ Status එක download කිරීමේදී දෝෂයක් වුණා. නැවත උත්සාහ කරන්න." }, { quoted: msg });
+      }
+      break;
+}
+					
 // ════════════ ALIVE ════════════
 
 case 'alive': {
@@ -1088,12 +1199,12 @@ case 'alive': {
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
 
-    const title = '*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗔𝗹𝗶𝘃𝗲 🎀] ¡! ❞*';
+    const title = '*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗔𝗹𝗶𝘃𝗲 🎀] ¡! ❞*';
     const content = `*⊹₊⟡⋆ ⋮ Ａｂｏｕｔ ᶻ 𝗓 𐰁 .ᐟ*\n` +
                     `➜ This is a lightweight, stable WhatsApp bot designed to run 24/7. It is allowing users and group admins to fine-tune the bot’s behavior.\n\n` +
                     `*⊹₊⟡⋆ ⋮ Ｄｅｐｌｏｙ ᶻ 𝗓 𐰁 .ᐟ*\n` +
-                    `➜ *Website:* https://akira.gotukolaya.site`;
-    const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*';
+                    `➜ *Website:* kadiya-md-production.up.railway.app`;
+    const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*';
 
     await socket.sendMessage(sender, {
         image: { url: akira },
