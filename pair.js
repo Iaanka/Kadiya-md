@@ -1215,7 +1215,104 @@ case 'alive': {
     
     break;
 }
+// ════════════ ALIVE ════════════
+case 'movie': {
+    try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
 
+    try {
+        const args = text.trim().split(/ +/).slice(1);
+        const movieName = args.join(' ');
+
+        if (!movieName) {
+            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+            return await socket.sendMessage(sender, { text: "❌ Movie එකේ නම දෙන්න.\n\n*Ex:* `.movie paththini`" }, { quoted: msg });
+        }
+
+        await socket.sendMessage(sender, { text: `🔍 *${movieName}* search කරනවා...` }, { quoted: msg });
+
+        // 1. SEARCH
+        const searchRes = await axios.get(`https://nntech-free-sinhalasub-search-api.vercel.app/api/search?text=${encodeURIComponent(movieName)}`);
+        
+        if(!searchRes.data || searchRes.data.length === 0){
+            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+            return await socket.sendMessage(sender, { text: `❌ "${movieName}" කියලා movie එකක් හොයාගන්න බැරි උනා.` }, { quoted: msg });
+        }
+
+        const results = searchRes.data;
+        let listMsg = `*NNTECH MOVIE SEARCH RESULTS*\n\n`;
+        
+        results.slice(0, 10).forEach((v, i) => {
+            listMsg += `*${i+1}.* ${v.title || v.name}\n`;
+        });
+        
+        listMsg += `\n⬇️ Download කරන්න number එක reply කරන්න\n*Ex:* 1`;
+
+        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
+        const sentMsg = await socket.sendMessage(sender, { text: listMsg }, { quoted: msg });
+
+        // 2. USER REPLY WAIT
+        socket.ev.once('messages.upsert', async (m) => {
+            const msg2 = m.messages[0]
+            if(!msg2.message || msg2.key.remoteJid !== sender) return
+            if(msg2.message.extendedTextMessage?.contextInfo?.stanzaId !== sentMsg.key.id) return
+
+            const choice = msg2.message.conversation || msg2.message.extendedTextMessage?.text
+            const index = parseInt(choice) - 1
+
+            if(isNaN(index) || index < 0 || index >= results.length) return
+
+            try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg2.key } }); } catch (_){}
+            await socket.sendMessage(sender, { text: `⬇️ Download link එක ගන්නවා...` }, { quoted: msg2 });
+
+            // 3. DOWNLOAD API
+            const downloadUrl = results[index].url || results[index].link
+            const dlRes = await axios.get(`https://nntech-free-sinhalasub-dl-api.vercel.app/api/download?url=${encodeURIComponent(downloadUrl)}`);
+
+            const videoUrl = dlRes.data?.url || dlRes.data?.download || dlRes.data?.result
+
+            if(!videoUrl){
+                try { await socket.sendMessage(sender, { react: { text: '❌', key: msg2.key } }); } catch (_){}
+                return await socket.sendMessage(sender, { text: "❌ Download link එක හොයාගන්න බැරි උනා" }, { quoted: msg2 });
+            }
+
+            // 4. FILE SIZE CHECK කරන්න
+            let fileSize = 0
+            try {
+                const head = await axios.head(videoUrl)
+                fileSize = parseInt(head.headers['content-length']) || 0
+            } catch(e){ console.log("Size check error", e) }
+
+            const sizeMB = (fileSize / 1024 / 1024).toFixed(2)
+            const MAX_SIZE = 100 // MB
+
+            if(fileSize > MAX_SIZE * 1024 * 1024){
+                // 100MB වැඩිනම් LINK විතරක්
+                try { await socket.sendMessage(sender, { react: { text: '📎', key: msg2.key } }); } catch (_){}
+                await socket.sendMessage(sender, { 
+                    text: `*${results[index].title || results[index].name}*\n\n⚠️ File එක ${sizeMB}MB. WhatsApp limit එක 100MB.\n\n*Download Link:* ${videoUrl}` 
+                }, { quoted: msg2 });
+            } else {
+                // 100MB අඩු නම් VIDEO එකම
+                try { await socket.sendMessage(sender, { react: { text: '📤', key: msg2.key } }); } catch (_){}
+                await socket.sendMessage(sender, { 
+                    video: { url: videoUrl }, 
+                    caption: `*${results[index].title || results[index].name}*\nSize: ${sizeMB}MB\n\nPowered by NNTECH`,
+                    mimetype: 'video/mp4'
+                }, { quoted: msg2 });
+            }
+            
+            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg2.key } }); } catch (_){}
+
+        }) // once නැතුව දැම්මේ
+
+    } catch (error) {
+        console.error("Movie Error:", error);
+        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+        await socket.sendMessage(sender, { text: "⚠️ Error එකක් ආවා. ටිකකින් ආපහු try කරන්න." }, { quoted: msg });
+    }
+    break;
+}
+					
 // ════════════ SYSTEM ════════════
 
     case 'system': {
