@@ -15,8 +15,6 @@ const { sms } = require("./msg");
 const router = express.Router();
 const pino = require('pino');
 const fs = require('fs');
-const path = ('./autoreply.json');
-if (!fs.existsSync(path)) fs.writeFileSync(path, JSON.stringify({}, null, 2);
 const mongoose = require('mongoose');
 const moment = require('moment-timezone');
 const Jimp = require('jimp');
