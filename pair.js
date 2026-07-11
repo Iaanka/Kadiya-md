@@ -28,17 +28,6 @@ const ffmpegPath = require("ffmpeg-static");
 ffmpeg.setFfmpegPath(ffmpegPath);
   const images = [
     'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    'https://i.ibb.co/nsvyKzHq/tourl-1779693358584.jpg',
-    'https://i.ibb.co/nqr1zs58/tourl-1779693359381.jpg',
-    'https://i.ibb.co/hFgRrkHG/tourl-1779693362084.jpg',
-    'https://i.ibb.co/b5BGG3qy/tourl-1779693381594.jpg',
-    'https://i.ibb.co/Xxwq0KbL/tourl-1779693384509.jpg',
-    'https://i.ibb.co/p60X2gCY/tourl-1779693391761.jpg',
-    'https://i.ibb.co/8LDKt9St/tourl-1779693394059.jpg',
-    'https://i.ibb.co/5XSxSGrd/tourl-1779693398804.jpg',
-    'https://i.ibb.co/NdJ2LFJp/tourl-1779693402284.jpg',
-    'https://i.ibb.co/rKRD8cCT/tourl-1779693404589.jpg',
-    'https://i.ibb.co/4nVwLGXm/tourl-1779693406982.jpg'
   ]; 
 
 const akira = images[Math.floor(Math.random() * images.length)];
@@ -75,14 +64,13 @@ const config = {
     MAX_RETRIES: 3,
     ADMIN_LIST_PATH: './admin.json',
     AKIRA_IMG: 'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    NEWSLETTER_JID: '120363419619460838@newsletter',
+    NEWSLETTER_JID: '120363399723529947@newsletter',
     NEWSLETTER_LIST: [
-        '120363425584831057@newsletter',
-        '120363422562980426@newsletter'
+        '120363399723529947@newsletter'
     ],
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
-    OWNER_NUMBER: '94761480834',
+    OWNER_NUMBER: '94763353368',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbAp1d6HVvTSFTYtco0T'
 };
 
@@ -912,7 +900,7 @@ const arabianCtxGlobal = {
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
-    newsletterJid  : '120363419619460838@newsletter',
+    newsletterJid  : '120363399723529947@newsletter',
     newsletterName : '🎀 𝗔𝗸𝗶𝗿𝗮-𝗠𝗗 | 𝗟𝗞 🇱🇰',
     serverMessageId: 143,
   },
@@ -934,7 +922,7 @@ const arabianCtxGlobal = {
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-      newsletterJid  : "120363419619460838@newsletter",
+      newsletterJid  : "120363399723529947@newsletter",
       newsletterName : ARABIAN_TITLE,
       serverMessageId: 123,
     }
@@ -999,6 +987,7 @@ ${readMore}
 │₊❏❜ ⋮ •ping ➜ ɢᴇᴛ ʙᴏᴛ ꜱᴘᴇᴇᴅ
 │₊❏❜ ⋮ •alive ➜ ᴄʜᴇᴄᴋ ʙᴏᴛ ᴀʟɪᴠᴇ
 │₊❏❜ ⋮ •owner ➜ ɢᴇᴛ ᴏᴡɴᴇʀ ɪɴꜰᴏ
+│₊❏❜ ⋮ •nic ➜ ɢᴇᴛ ɴɪᴄ ɪɴꜰᴏ
 ╰──────────────────<𝟑 .ᐟ
 ${readMore}
 ╭─⊹₊⟡⋆『 \`𝐃𝐰𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
@@ -1092,7 +1081,7 @@ case 'alive': {
     const content = `*⊹₊⟡⋆ ⋮ Ａｂｏｕｔ ᶻ 𝗓 𐰁 .ᐟ*\n` +
                     `➜ This is a lightweight, stable WhatsApp bot designed to run 24/7. It is allowing users and group admins to fine-tune the bot’s behavior.\n\n` +
                     `*⊹₊⟡⋆ ⋮ Ｄｅｐｌｏｙ ᶻ 𝗓 𐰁 .ᐟ*\n` +
-                    `➜ *Website:* https://akira.gotukolaya.site`;
+                    `➜ *Website:* kadiya-md-production.up.railway.app`;
     const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*';
 
     await socket.sendMessage(sender, {
@@ -1138,7 +1127,152 @@ case 'alive': {
       break;
 	}
 
-// ════════════ SONG ════════════
+// ════════════ ɴɪᴄᴇ ════════════
+case 'nic':
+case 'nicinfo':
+case 'nicdecode': {
+    try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
+
+    const nicInput = (args[0] || '').toString().trim().toUpperCase();
+    const nicRegex = /^([0-9]{9}[VXvx]|[0-9]{12})$/;
+
+    if (!nicInput || !nicRegex.test(nicInput)) {
+        try { await socket.sendMessage(sender, { react: { text: '❓', key: msg.key } }); } catch (_) {}
+        return await socket.sendMessage(sender, {
+            text: `*❓ Usage:*\n${sessionConfig.PREFIX || '.'}nic <NIC_NUMBER>\n\n*Example:* ${sessionConfig.PREFIX || '.'}nic 705693323V`
+        }, { quoted: msg });
+    }
+
+    try {
+        const apiRes = await axios.get(`https://nic-decoder-by-kcey.onrender.com/api/nic/${nicInput}`, {
+            timeout: 25000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+
+        const data = apiRes.data;
+        const result = data?.data || data?.result || data;
+
+        if (!result || data?.success === false || data?.error) {
+            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+            return await socket.sendMessage(sender, {
+                text: `❌ NIC *${nicInput}* සදහා තොරතුරු ලබාගත නොහැකි විය.\n${data?.error || data?.message || ''}`
+            }, { quoted: msg });
+        }
+
+        // Base Data
+        const dobStr = result.dob || result.dateOfBirth || result.birthday;
+        let gender = result.gender || result.sex || 'N/A';
+        const nicType = result.type || (nicInput.length === 10 ? 'Old Format (9-Digit)' : 'New Format (12-Digit)');
+
+        if (!dobStr || dobStr === 'N/A') {
+            throw new Error("Could not extract Date of Birth from API.");
+        }
+
+        // Gender සිංහලෙන් සහ Emoji සමඟ ලස්සන කිරීම
+        if (gender.toLowerCase() === 'male') gender = 'Male 👦 (පුරුෂ)';
+        else if (gender.toLowerCase() === 'female') gender = 'Female 👧 (ස්ත්‍රී)';
+
+        // Age Calculation
+        const birthDate = new Date(dobStr);
+        const today = new Date();
+        
+        let years = today.getFullYear() - birthDate.getFullYear();
+        let months = today.getMonth() - birthDate.getMonth();
+        let days = today.getDate() - birthDate.getDate();
+
+        if (days < 0) {
+            months -= 1;
+            const previousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+            days += previousMonth.getDate();
+        }
+        if (months < 0) {
+            years -= 1;
+            months += 12;
+        }
+        const ageShow = `${years} Years, ${months} Months, ${days} Days`;
+
+        // Zodiac Sign Calculation
+        const month = birthDate.getMonth() + 1;
+        const day = birthDate.getDate();
+        let zodiac = 'N/A';
+
+        if ((month == 3 && day >= 21) || (month == 4 && day <= 19)) zodiac = 'Aries ♈ (මේෂ)';
+        else if ((month == 4 && day >= 20) || (month == 5 && day <= 20)) zodiac = 'Taurus ♉ (වෘෂභ)';
+        else if ((month == 5 && day >= 21) || (month == 6 && day <= 20)) zodiac = 'Gemini ♊ (මිථුන)';
+        else if ((month == 6 && day >= 21) || (month == 7 && day <= 22)) zodiac = 'Cancer ♋ (කටක)';
+        else if ((month == 7 && day >= 23) || (month == 8 && day <= 22)) zodiac = 'Leo ♌ (සිංහ)';
+        else if ((month == 8 && day >= 23) || (month == 9 && day <= 22)) zodiac = 'Virgo ♍ (කන්‍යා)';
+        else if ((month == 9 && day >= 23) || (month == 10 && day <= 22)) zodiac = 'Libra ♎ (තුලා)';
+        else if ((month == 10 && day >= 23) || (month == 11 && day <= 21)) zodiac = 'Scorpio ♏ (වෘශ්චික)';
+        else if ((month == 11 && day >= 22) || (month == 12 && day <= 21)) zodiac = 'Sagittarius ♐ (ධනු)';
+        else if ((month == 12 && day >= 22) || (month == 1 && day <= 19)) zodiac = 'Capricorn ♑ (මකර)';
+        else if ((month == 1 && day >= 20) || (month == 2 && day <= 18)) zodiac = 'Aquarius ♒ (කුම්භ)';
+        else if ((month == 2 && day >= 19) || (month == 3 && day <= 20)) zodiac = 'Pisces ♓ (මීන)';
+
+        // Generation Calculation
+        const birthYear = birthDate.getFullYear();
+        let generation = 'N/A';
+
+        if (birthYear >= 1928 && birthYear <= 1945) generation = 'Silent Generation 👴👵';
+        else if (birthYear >= 1946 && birthYear <= 1964) generation = 'Baby Boomers 👶💥';
+        else if (birthYear >= 1965 && birthYear <= 1980) generation = 'Generation X (Gen X) 💼';
+        else if (birthYear >= 1981 && birthYear <= 1996) generation = 'Millennials (Gen Y) 📱';
+        else if (birthYear >= 1997 && birthYear <= 2012) generation = 'Generation Z (Gen Z) 🎮';
+        else if (birthYear >= 2013 && birthYear <= 2026) generation = 'Generation Alpha (Gen Alpha) 🤖';
+
+        // 🌟 Premium Quality Output Design 🌟
+        let out = `✨ *𝗦𝗥𝗜 𝗟𝗔𝗡𝗞𝗔 𝗡𝗜𝗖 𝗗𝗘𝗖𝗢𝗗𝗘𝗥* ✨\n`;
+        out += `⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n`;
+        
+        out += `📝 *📋 𝖯𝖾𝗋𝗌𝗈𝗇𝖺𝗅 𝖨𝗇𝖿𝗈𝗋𝗆𝖺𝗍𝗂𝗈𝗇*\n`;
+        out += `  📍 *NIC:* ${nicInput}\n`;
+        out += `  👤 *Gender:* ${gender}\n`;
+        out += `  📅 *DOB:* ${dobStr}\n`;
+        out += `  ⏳ *Age:* ${ageShow}\n\n`;
+        
+        out += `✨ *🔮 𝖠𝗌𝗍𝗋𝗈𝗅𝗈𝗀𝗒 & 𝖦𝖾𝗇𝖾𝗋𝖺𝗍𝗂𝗈𝗇*\n`;
+        out += `  ♌ *Zodiac:* ${zodiac}\n`;
+        out += `  🌐 *Gen:* ${generation}\n\n`;
+        
+        out += `⚙️ *ℹ️ 𝖲𝗒𝗌𝗍𝖾𝗆 𝖣𝖾𝗍𝖺𝗂𝗅𝗌*\n`;
+        out += `  📊 *Type:* ${nicType}\n`;
+        out += `  ⚡ *Status:* Decoded Successfully ✓\n\n`;
+        
+        out += `> 𝐊 𝐂𝐞𝐘 | 𝐃𝐞𝐯𝐑𝐚𝐛𝐛𝐢𝐭𝐙𝐳 🎀`;
+
+        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        
+        await socket.sendMessage(sender, {
+            text: out.trim(),
+            contextInfo: {
+                externalAdReply: {
+                    title: `✨ NIC DECODER INSIGHTS ✨`,
+                    body: `ID: ${nicInput} | Age: ${years} Years`,
+                    thumbnailUrl: akira, 
+                    sourceUrl: '',
+                    mediaType: 1,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: msg });
+
+    } catch (error) {
+        console.error('NIC Decoder Error:', error.message);
+        const isTimeout = error.message.includes('timeout') || error.code === 'ECONNABORTED';
+        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+        
+        await socket.sendMessage(sender, {
+            text: isTimeout 
+                ? `⚠️ API Timeout විය! කරුණාකර තත්පර කිහිපයකින් නැවත උත්සාහ කරන්න.`
+                : `⚠️ Error decoding NIC: ${error.message}`
+        }, { quoted: msg });
+    }
+    break;
+}
+
+// ════════════ ꜱᴏɴɢ ════════════
 
 case 'song':
 case 'ytmp3': {
@@ -2048,8 +2182,8 @@ case 'fancytext': {
 // ════════════ OWNER ════════════
 
                 case 'owner': {
-    const ownerNum = '+94707447414';
-    const ownerName = 'お 𝐂𝐡𝐚𝐦𝐨𝐝 ࣪𖤐.ᐟ';
+    const ownerNum = '94763353368';
+    const ownerName = 'お ɪꜱᴀɴᴋᴀ ࣪𖤐.ᐟ';
     
     await socket.sendMessage(sender, { react: { text: '🥷', key: msg.key } });
 
@@ -2064,7 +2198,7 @@ case 'fancytext': {
     });
 
     await socket.sendMessage(sender, {
-        text: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗢𝘄𝗻𝗲𝗿 🎀] ¡! ❞*\n\n₊❏❜ ⋮👤 Name: ${ownerName}\n₊❏❜ ⋮ 📞 Number: ${ownerNum}\n\n> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`,
+        text: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗢𝘄𝗻𝗲𝗿 🎀] ¡! ❞*\n\n₊❏❜ ⋮👤 Name: ${ownerName}\n₊❏❜ ⋮ 📞 Number: ${ownerNum}\n\n> *𝗔esthatic 𝗤ueen 𝗕y ɪꜱᴀɴᴋᴀ 𝜗𝜚⋆*`,
         contextInfo: {
             mentionedJid: [`${ownerNum.slice(1)}@s.whatsapp.net`]
         }
