@@ -2641,7 +2641,8 @@ case 'newmail': {
 
 // ════════════ FREE FIRE UID INFO ════════════
 // .ffinfo <uid>   -> fetch Free Fire player info by UID
-case 'nic':
+
+        case 'nic':
 case 'nicinfo':
 case 'nicdecode': {
     try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
@@ -2674,16 +2675,20 @@ case 'nicdecode': {
             }, { quoted: msg });
         }
 
-        // Base Data (API එකෙන් ගන්නා දත්ත)
+        // Base Data
         const dobStr = result.dob || result.dateOfBirth || result.birthday;
-        const gender = result.gender || result.sex || 'N/A';
-        const nicType = result.type || (nicInput.length === 10 ? 'Old NIC' : 'New NIC');
+        let gender = result.gender || result.sex || 'N/A';
+        const nicType = result.type || (nicInput.length === 10 ? 'Old Format (9-Digit)' : 'New Format (12-Digit)');
 
         if (!dobStr || dobStr === 'N/A') {
             throw new Error("Could not extract Date of Birth from API.");
         }
 
-        // --- 1. [object Object] එක FIX කිරීම සහ වයස හරියටම හැදීම ---
+        // Gender සිංහලෙන් සහ Emoji සමඟ ලස්සන කිරීම
+        if (gender.toLowerCase() === 'male') gender = 'Male 👦 (පුරුෂ)';
+        else if (gender.toLowerCase() === 'female') gender = 'Female 👧 (ස්ත්‍රී)';
+
+        // Age Calculation
         const birthDate = new Date(dobStr);
         const today = new Date();
         
@@ -2693,7 +2698,6 @@ case 'nicdecode': {
 
         if (days < 0) {
             months -= 1;
-            // කලින් මාසයේ දින ගණන එකතු කිරීම
             const previousMonth = new Date(today.getFullYear(), today.getMonth(), 0);
             days += previousMonth.getDate();
         }
@@ -2703,8 +2707,8 @@ case 'nicdecode': {
         }
         const ageShow = `${years} Years, ${months} Months, ${days} Days`;
 
-        // --- 2. Zodiac Sign (ලග්නය) Bot එකෙන්ම සෙවීම ---
-        const month = birthDate.getMonth() + 1; // JS Months 0-11 නිසා
+        // Zodiac Sign Calculation
+        const month = birthDate.getMonth() + 1;
         const day = birthDate.getDate();
         let zodiac = 'N/A';
 
@@ -2721,7 +2725,7 @@ case 'nicdecode': {
         else if ((month == 1 && day >= 20) || (month == 2 && day <= 18)) zodiac = 'Aquarius ♒ (කුම්භ)';
         else if ((month == 2 && day >= 19) || (month == 3 && day <= 20)) zodiac = 'Pisces ♓ (මීන)';
 
-        // --- 3. Generation Info (පරම්පරාව) Bot එකෙන්ම සෙවීම ---
+        // Generation Calculation
         const birthYear = birthDate.getFullYear();
         let generation = 'N/A';
 
@@ -2730,18 +2734,27 @@ case 'nicdecode': {
         else if (birthYear >= 1965 && birthYear <= 1980) generation = 'Generation X (Gen X) 💼';
         else if (birthYear >= 1981 && birthYear <= 1996) generation = 'Millennials (Gen Y) 📱';
         else if (birthYear >= 1997 && birthYear <= 2012) generation = 'Generation Z (Gen Z) 🎮';
-        else if (birthYear >= 2013 && birthYear <= 2024) generation = 'Generation Alpha (Gen Alpha) 🤖';
+        else if (birthYear >= 2013 && birthYear <= 2026) generation = 'Generation Alpha (Gen Alpha) 🤖';
 
-        // Output එක සැකසීම
-        let out = `*🦋 𝗡𝗜𝗖 𝗗𝗲𝗰𝗼𝗱𝗲𝗿 𝗜𝗻𝘀𝗶𝗴𝗵𝘁𝘀 🦋*\n\n`;
-        out += `🆔 *NIC Number:* ${nicInput}\n`;
-        out += `📊 *Format Type:* ${nicType}\n`;
-        out += `🎂 *Date of Birth:* ${dobStr}\n`;
-        out += `👤 *Gender:* ${gender}\n`;
-        out += `⏳ *Current Age:* ${ageShow}\n`;
-        out += `♌ *Zodiac Sign:* ${zodiac}\n`;
-        out += `🌐 *Generation:* ${generation}\n\n`;
-        out += `> 𝐊 𝐂𝐞𝐘 | 𝐃𝐞𝐯𝐑𝐚𝐛𝐛𝐢𝐭𝐙𝐳 🎀`;
+        // 🌟 Premium Quality Output Design 🌟
+        let out = `✨ *𝗦𝗥𝗜 𝗟𝗔𝗡𝗞𝗔 𝗡𝗜𝗖 𝗗𝗘𝗖𝗢𝗗𝗘𝗥* ✨\n`;
+        out += `⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n`;
+        
+        out += `📝 *📋 𝖯𝖾𝗋𝗌𝗈𝗇𝖺𝗅 𝖨𝗇𝖿𝗈𝗋𝗆𝖺𝗍𝗂𝗈𝗇*\n`;
+        out += `  📍 *NIC:* ${nicInput}\n`;
+        out += `  👤 *Gender:* ${gender}\n`;
+        out += `  📅 *DOB:* ${dobStr}\n`;
+        out += `  ⏳ *Age:* ${ageShow}\n\n`;
+        
+        out += `✨ *🔮 𝖠𝗌𝗍𝗋𝗈𝗅𝗈𝗀𝗒 & 𝖦𝖾𝗇𝖾𝗋𝖺𝗍𝗂𝗈𝗇*\n`;
+        out += `  ♌ *Zodiac:* ${zodiac}\n`;
+        out += `  🌐 *Gen:* ${generation}\n\n`;
+        
+        out += `⚙️ *ℹ️ 𝖲𝗒𝗌𝗍𝖾𝗆 𝖣𝖾𝗍𝖺𝗂𝗅𝗌*\n`;
+        out += `  📊 *Type:* ${nicType}\n`;
+        out += `  ⚡ *Status:* Decoded Successfully ✓\n\n`;
+        
+        out += `> 𝐈𝐬𝐀𝐧𝐤𝐚 | 𝐊𝐀𝐃𝐈𝐘𝐀 𝐁𝐎𝐓 🎀`;
 
         try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
         
@@ -2749,8 +2762,8 @@ case 'nicdecode': {
             text: out.trim(),
             contextInfo: {
                 externalAdReply: {
-                    title: `NIC Decoder - ${nicInput}`,
-                    body: `Gender: ${gender} | Age: ${years} Years`,
+                    title: `✨ NIC DECODER INSIGHTS ✨`,
+                    body: `ID: ${nicInput} | Age: ${years} Years`,
                     thumbnailUrl: akira, 
                     sourceUrl: '',
                     mediaType: 1,
