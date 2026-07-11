@@ -2654,14 +2654,42 @@ case 'ff': {
         }, { quoted: msg });
     }
 
-    try {
-        const apiRes = await axios.get('https://ff-id-info-4-akira-girl-8bru.vercel.app/player-info', {
-            params: { uid },
-            timeout: 15000
-        });
+    // බහුතරයක් වැඩ කරන API ලැයිස්තුවක් (එකක් fail වුනොත් අනෙක වැඩ කරයි)
+    const apiUrls = [
+        'https://ff-id-info-4-akira-girl-8bru.vercel.app/player-info',
+        'https://freefire-api.vercel.app/api/player' // Fallback API 1 (උදාහරණයක් ලෙස)
+    ];
 
+    let apiRes = null;
+    let errorMsg = '';
+
+    // API එකෙන් එක try කිරීම
+    for (const url of apiUrls) {
+        try {
+            apiRes = await axios.get(url, {
+                params: { uid },
+                timeout: 30000, // Timeout එක තත්පර 30ක් දක්වා වැඩි කලා
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+            });
+            if (apiRes.data) break; // Data ලැබුනොත් loop එක නවත්වන්න
+        } catch (err) {
+            errorMsg = err.response?.data?.error || err.message;
+            console.log(`Failed fetching from ${url}, trying next...`);
+        }
+    }
+
+    // කිසිම API එකක් වැඩ නොකලොත්
+    if (!apiRes || !apiRes.data) {
+        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+        return await socket.sendMessage(sender, {
+            text: `⚠️ API එකෙන් ප්‍රතිචාරයක් නැත (Timeout). කරුණාකර සුළු මොහොතකින් නැවත උත්සාහ කරන්න.\n*Error:* ${errorMsg}`
+        }, { quoted: msg });
+    }
+
+    try {
         const data = apiRes.data;
-        // API may wrap the payload differently, so check a few common shapes
         const result = data?.data || data?.result || data?.player || data;
 
         if (!result || data?.success === false || data?.error) {
@@ -2671,7 +2699,7 @@ case 'ff': {
             }, { quoted: msg });
         }
 
-        // Flatten possible nested sections so we can pull fields regardless of exact naming
+        // Flatten sections
         const basic = result.basicInfo || result.basic_info || result.AccountInfo || result.account || result;
         const clan = result.clanBasicInfo || result.guild || result.Guild || result.clan;
         const brRank = result.brRank || result.BR_Rank || result.rank?.br;
@@ -2728,15 +2756,16 @@ case 'ff': {
         }, { quoted: msg });
 
     } catch (error) {
-        console.error('FF Info Error:', error.response?.data || error.message);
+        console.error('FF Info Error:', error.message);
         try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
         await socket.sendMessage(sender, {
-            text: `⚠️ Error fetching player info: ${error.response?.data?.error || error.message}`
+            text: `⚠️ Error parsing player info: ${error.message}`
         }, { quoted: msg });
     }
     break;
 }
 
+// ════════════ Check mail ════════════
 case 'checkmail':
 case 'inbox':
 case 'mailcheck': {
