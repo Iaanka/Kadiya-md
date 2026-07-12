@@ -20,6 +20,7 @@ const Jimp = require('jimp');
 const crypto = require('crypto');
 const axios = require('axios');
 const yts = require('yt-search');
+const userSessions = new Map();
 const { ytmp3, ytmp4 } = require('sadaslk-dlcore');
 const os = require('os');
 const fecth = require('node-fetch');
@@ -1121,6 +1122,105 @@ ${readMore}
       }
       break;
     }
+	// ════════════ ALIVE ════════════
+// ═══════════════════════════════════════════
+//   📩 STEP 1: Switch statement එකට කලින් දාන්න
+//   (මේක Message handler function එකේ, switch(command) එකට උඩින්)
+// ═══════════════════════════════════════════
+if (userSessions.has(sender)) {
+    const session = userSessions.get(sender);
+
+    // 5 minutes Timeout
+    if (Date.now() - session.timestamp > 5 * 60 * 1000) {
+        userSessions.delete(sender);
+    } else if (session.step === 'waiting_answer') {
+        userSessions.delete(sender);
+
+        const userAnswer = body.trim();
+
+        const finalMessage = session.type === 'love'
+            ? `💑 වාව්! *${userAnswer}* කියන්නේ ලස්සන නමක්! ${userAnswer} වගේ කෙනෙක් ඔයාට ලැබුනා කියන්නේ ඔයා හරි Lucky කෙනෙක්. ❤️ ආදරය රැකගන්න!`
+            : `🖤 තේරෙනවා... *"${userAnswer}"* කියන එක Valid හේතුවක්. ඒත් හොඳම කෙනා ලැබෙන්නම ඉන්නවා, ඉවසන්න. ⏳✨`;
+
+        const finalCaption = `*↳ ❝ [💌 𝗟𝗼𝘃𝗲 𝗦𝘁𝗮𝘁𝘂𝘀 𝗠𝗲𝘀𝘀𝗮𝗴𝗲 💌] ¡! ❞*\n\n` +
+                              `┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓\n` +
+                              `┃ ${finalMessage}\n` +
+                              `┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛\n\n` +
+                              `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`;
+
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const imgFolder = './assets/images/';
+            const images = fs.readdirSync(imgFolder).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
+
+            if (images.length > 0) {
+                const randomImg = images[Math.floor(Math.random() * images.length)];
+                await socket.sendMessage(sender, {
+                    image: { url: path.join(imgFolder, randomImg) },
+                    caption: finalCaption,
+                    contextInfo: arabianCtx()
+                }, { quoted: msg });
+            } else {
+                throw new Error('No images found');
+            }
+        } catch (imgError) {
+            await socket.sendMessage(sender, {
+                text: finalCaption,
+                contextInfo: arabianCtx()
+            }, { quoted: msg });
+        }
+
+        return; // switch statement එකට යන්නෙ නෑ, මෙතනින්ම Stop
+    }
+}
+
+
+// ═══════════════════════════════════════════
+//   🎯 STEP 2: switch(command) { ... } ඇතුලේ dāgena
+// ═══════════════════════════════════════════
+case 'lovemsg': case 'status2': {
+    try { await socket.sendMessage(sender, { react: { text: '💭', key: msg.key } }); } catch (_) {}
+
+    try {
+        const args = body.split(' ').slice(1).join(' ').trim().toLowerCase();
+
+        if (!args || !['love', 'single'].includes(args)) {
+            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
+            return await socket.sendMessage(sender, {
+                text: `*💌 𝗟𝗢𝗩𝗘 𝗦𝗧𝗔𝗧𝗨𝗦 𝗠𝗘𝗦𝗦𝗔𝗚𝗘 𝗦𝗬𝗦𝗧𝗘𝗠 💌*\n\n` +
+                      `📍 \`.lovemsg love\`   → ලවු කරන අයට 💑\n` +
+                      `📍 \`.lovemsg single\` → තනිව ඉන්න අයට 🖤`
+            }, { quoted: msg });
+        }
+
+        // Session එක Save කරනවා
+        userSessions.set(sender, {
+            type: args,
+            step: 'waiting_answer',
+            timestamp: Date.now()
+        });
+
+        const question = args === 'love'
+            ? "💑 හරි! ඔයා Love කරන කෙල්ලගේ නම මොකක්ද? (Reply කරන්න)"
+            : "🖤 හරි! ඇයි ඔයා තනියම ඉන්නේ? හේතුව කියන්න (Reply කරන්න)";
+
+        await socket.sendMessage(sender, {
+            text: `*↳ ❝ [💌 𝗤𝘂𝗲𝘀𝘁𝗶𝗼𝗻 💌] ¡! ❞*\n\n${question}`,
+            contextInfo: arabianCtx()
+        }, { quoted: msg });
+
+        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+
+    } catch (error) {
+        console.error("Love Status Error:", error);
+        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
+        await socket.sendMessage(sender, {
+            text: "⚠️ දෝෂයක් වුණා. නැවත උත්සාහ කරන්න."
+        }, { quoted: msg });
+    }
+    break;
+}
      // ════════════ SEND ═══════════
 		case 'send': {
       // බොට් ක්‍රියාවලිය පටන් ගත් බව පෙන්වීමට React එකක් දමයි
