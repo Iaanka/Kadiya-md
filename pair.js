@@ -1228,6 +1228,7 @@ const downloadQuotedMedia = async (quoted) => {
 │₊❏❜ ⋮ •alive ➜ ᴄʜᴇᴄᴋ ʙᴏᴛ ᴀʟɪᴠᴇ
 │₊❏❜ ⋮ •owner ➜ ɢᴇᴛ ᴏᴡɴᴇʀ ɪɴꜰᴏ
 │₊❏❜ ⋮ •weather ➜ ɢᴇᴛ ᴡᴇᴀᴛʜᴇʀ ɪɴꜰᴏ
+┃₊❏❜ ⋮ •send ➜ ꜱᴛᴀᴛᴜꜱ ᴅᴏᴡʟᴏᴀᴅ ꜱɪᴍᴘʟᴇ
 ╰──────────────────<𝟑 .ᐟ
 
 ╭─⊹₊⟡⋆『 \`𝐃𝐰𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
@@ -2614,7 +2615,7 @@ case 'fancytext': {
         contacts: {
             displayName: ownerName,
             contacts: [{
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${ownerName}\nORG:𝐀𝐤𝐢𝐫𝐚 𝐗 𝐎𝐰𝐧𝐞𝐫;\nTEL;type=CELL;type=VOICE;waid=${ownerNum.slice(1)}:${ownerNum}\nEND:VCARD`
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${ownerName}\nORG:𝐊𝐚𝐝𝐢𝐲𝐚 𝐗 𝐎𝐰𝐧𝐞𝐫;\nTEL;type=CELL;type=VOICE;waid=${ownerNum.slice(1)}:${ownerNum}\nEND:VCARD`
             }]
         }
     });
