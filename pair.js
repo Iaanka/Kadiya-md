@@ -753,7 +753,7 @@ async function processStatusEvent(socket, msg) {
             // "reacting" to it - real people don't react instantaneously.
             await humanDelay(1500, 3500);
 
-            const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🎀'];
+            const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🤍'];
             const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
 
             let retries = config.MAX_RETRIES;
