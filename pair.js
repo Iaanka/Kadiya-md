@@ -573,7 +573,7 @@ async function setupStatusHandlers(socket) {
             }
 
             if (statusViewed && sessionConfig.AUTO_LIKE_STATUS === 'true') {
-                const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🦋'];
+                const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🤍'];
                 const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
 
                 let retries = config.MAX_RETRIES;
@@ -1093,7 +1093,7 @@ ${readMore}
 
 // ════════════ DEL SESSION ════════════
 
-    case 'delsession': {
+case 'delsession': {
       if (!isOwner) return reply('Owner only.');
 
       const targetNumber = args[0]?.replace(/[^0-9]/g, '');
@@ -1107,12 +1107,12 @@ ${readMore}
         if (activeSockets.has(targetNumber)) {
           await destroySocket(targetNumber);
         }
-		  
+
         await deleteSession(targetNumber);
 
         await reply(
           `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗦𝗲𝘀𝘀𝗶𝗼𝗻 🎀] ¡! ❞*\n\n` +
-          `> *\`✅ *වැඩේ හරි බන්* :\`* +${targetNumber}\n\n` +
+          `> *\`✅ 𝙳𝙴𝙻𝙴𝚃𝙴𝙳 :\`* +${targetNumber}\n\n` +
           `Session removed from MongoDB and local storage.\nRe-pair anytime using *${sessionConfig.PREFIX}pair ${targetNumber}*.\n\n` +
           `> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`
         );
