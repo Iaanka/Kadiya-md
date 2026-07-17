@@ -1138,134 +1138,83 @@ case 'alive': {
 	}
 
 // ════════════ SONG ════════════
-
-case 'song':
-case 'ytmp3': {
+case 'lyrics':
+case 'song': {
     try {
         const query = args.join(' ');
         if (!query) return reply("🎵 *Plz Send Me A Song Name !*");
 
         try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
 
-        // 1) Search video
-        let search;
+        const apiUrl = `https://api.zanta-mini.store/api/song?apiKey=zan_w8lSd1pK_t79f2pa52p&url=${encodeURIComponent(query)}`;
+
+        let data;
         try {
-            search = await yts(query);
+            const res = await axios.get(apiUrl, {
+                timeout: 15000,
+                headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            data = res.data;
         } catch (e) {
-            console.log("YTS SEARCH ERROR:", e);
-            return reply("❌ *Search Failed, Try Again Later !*");
+            console.log("LYRICS API ERROR:", e.message);
+            return reply("❌ *Lyrics Server Error, Try Again Later !*");
         }
 
-        const video = search?.videos?.[0];
-        if (!video) return reply("❌ *I Cant Find It !*");
+        if (!data || !data.success || !data.result) {
+            return reply("❌ *I Cant Find Lyrics For That !*");
+        }
+
+        const { title, url, thumbnail, lyrics } = data.result;
+
+        if (!lyrics) return reply("❌ *No Lyrics Found For That Song !*");
 
         const slDate = moment().tz('Asia/Colombo').format('YYYY-MM-DD');
         const slTimeNow = moment().tz('Asia/Colombo').format('HH:mm:ss');
 
-        const caption = `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗩𝗶𝗱𝗲𝗼 🎀] ¡! ❞*\n\n` +
-                        `> *\`🎵 𝚃𝙸𝚃𝙻𝙴 :\`* ${video.title}\n` +
-                        `> *\`👤 𝙲𝙷𝙰𝙽𝙽𝙴𝙻 :\`* ${video.author.name}\n` +
-                        `> *\`⏱️ 𝙳𝚄𝚁𝙰𝚃𝙸𝙾𝙽 :\`* ${video.timestamp}\n` +
-                        `> *\`👀 𝚅𝙸𝙴𝚆𝚂 :\`* ${video.views.toLocaleString()}\n` +
-                        `> *\`📅 𝙳𝙰𝚃𝙴 :\`* ${slDate}\n` +
-                        `> *\`⌚ 𝚃𝙸𝙼𝙴 :\`* ${slTimeNow}\n\n` +
-                        `> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`;
+        // WhatsApp caption limit is ~1024 chars — keep header short, send lyrics separately if long
+        const header = `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗟ʏʀɪᴄs 🎀] ¡! ❞*\n\n` +
+                       `> *\`🎵 𝚃𝙸𝚃𝙻𝙴 :\`* ${title}\n` +
+                       `> *\`📅 𝙳𝙰𝚃𝙴 :\`* ${slDate}\n` +
+                       `> *\`⌚ 𝚃𝙸𝙼𝙴 :\`* ${slTimeNow}\n\n` +
+                       `> *𝗞ᴀᴅɪʏᴀ 𝗕ʏ 𝗜sanka 𝜗𝜚⋆*`;
 
-        // Fire thumbnail send WITHOUT waiting for it — runs in parallel with download below
-        const thumbnailPromise = socket.sendMessage(sender, {
-            image: { url: video.thumbnail },
-            caption: caption,
-            contextInfo: arabianCtx()
-        }, { quoted: msg }).catch(e => {
-            console.log("THUMBNAIL SEND ERROR:", e);
-            // not fatal
-        });
-
-        // 2) Try multiple download APIs (fallback chain) — runs concurrently with thumbnail send
-        const apiList = [
-            `https://ytdl-new-dxz.vercel.app/api/ytmp3?url=${encodeURIComponent(video.url)}`,
-            `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(video.url)}`,
-            `https://apis.ryzendesu.vip/api/downloader/ytmp3?url=${encodeURIComponent(video.url)}`
-        ];
-
-        let downloadUrl = null;
-
-        for (const apiUrl of apiList) {
-            try {
-                const ytRes = await axios.get(apiUrl, {
-                    timeout: 8000, // reduced from 25s — fail fast, move to next API
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
-                });
-
-                const data = ytRes.data;
-                const candidate =
-                    data?.download_url ||
-                    data?.result?.download_url ||
-                    data?.result?.url ||
-                    data?.result ||
-                    data?.url;
-
-                if (candidate && typeof candidate === 'string' && candidate.startsWith('http')) {
-                    downloadUrl = candidate;
-                    break;
-                }
-            } catch (e) {
-                console.log(`YTMP3 API FAILED (${apiUrl}):`, e.message);
-                continue; // try next API
-            }
-        }
-
-        // make sure thumbnail send has finished before we move on (it should already be done or close)
-        await thumbnailPromise;
-
-        if (!downloadUrl) return reply("❌ *All Download Servers Failed, Try Again Later !*");
-
-        // 3) Download as buffer (more reliable than passing remote URL directly)
-        let audioBuffer;
         try {
-            const fileRes = await axios.get(downloadUrl, {
-                responseType: 'arraybuffer',
-                timeout: 20000, // reduced from 60s — most songs finish well within this
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
-
-            const contentType = fileRes.headers['content-type'] || '';
-            if (!contentType.includes('audio') && !contentType.includes('octet-stream')) {
-                console.log("UNEXPECTED CONTENT-TYPE:", contentType);
-                return reply("❌ *Download Server Returned Invalid File !*");
-            }
-
-            audioBuffer = Buffer.from(fileRes.data);
-
-            // WhatsApp file size safety check (~64MB practical limit)
-            if (audioBuffer.length < 1000) {
-                return reply("❌ *Downloaded File Is Empty / Broken !*");
+            if (thumbnail) {
+                await socket.sendMessage(sender, {
+                    image: { url: thumbnail },
+                    caption: header,
+                    contextInfo: arabianCtx()
+                }, { quoted: msg });
+            } else {
+                await socket.sendMessage(sender, { text: header, contextInfo: arabianCtx() }, { quoted: msg });
             }
         } catch (e) {
-            console.log("AUDIO DOWNLOAD ERROR:", e.message);
-            return reply("❌ *Failed To Download Audio File !*");
+            console.log("LYRICS HEADER SEND ERROR:", e);
+            // not fatal, continue to send lyrics text
         }
 
-        // 4) Send audio buffer
-        try {
-            await socket.sendMessage(sender, {
-                audio: audioBuffer,
-                mimetype: 'audio/mpeg',
-                ptt: false
-            }, { quoted: msg });
-        } catch (e) {
-            console.log("AUDIO SEND ERROR:", e);
-            return reply("❌ *Failed To Send Audio !*");
+        // Send lyrics as a separate message, chunked if too long (WhatsApp text limit ~65536, but keep readable chunks)
+        const CHUNK_SIZE = 4000;
+        const lyricsText = `📜 *𝗟𝗬𝗥𝗜𝗖𝗦*\n\n${lyrics}` + (url ? `\n\n🔗 *𝚂𝙾𝚄𝚁𝙲𝙴:* ${url}` : '');
+
+        if (lyricsText.length <= CHUNK_SIZE) {
+            await socket.sendMessage(sender, { text: lyricsText, contextInfo: arabianCtx() }, { quoted: msg });
+        } else {
+            for (let i = 0; i < lyricsText.length; i += CHUNK_SIZE) {
+                const chunk = lyricsText.slice(i, i + CHUNK_SIZE);
+                await socket.sendMessage(sender, { text: chunk, contextInfo: arabianCtx() });
+            }
         }
 
         try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
 
     } catch (e) {
-        console.log("SONG CMD ERROR:", e);
+        console.log("LYRICS CMD ERROR:", e);
         reply("❌ *Error: " + e.message + "*");
     }
     break;
 }
+
 					
 // ════════════ VIDEO ════════════
 
