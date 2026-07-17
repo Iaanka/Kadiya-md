@@ -27,7 +27,18 @@ const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 ffmpeg.setFfmpegPath(ffmpegPath);
   const images = [
-    'https://files.catbox.moe/riqrud.jpg'
+    'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
+    'https://i.ibb.co/nsvyKzHq/tourl-1779693358584.jpg',
+    'https://i.ibb.co/nqr1zs58/tourl-1779693359381.jpg',
+    'https://i.ibb.co/hFgRrkHG/tourl-1779693362084.jpg',
+    'https://i.ibb.co/b5BGG3qy/tourl-1779693381594.jpg',
+    'https://i.ibb.co/Xxwq0KbL/tourl-1779693384509.jpg',
+    'https://i.ibb.co/p60X2gCY/tourl-1779693391761.jpg',
+    'https://i.ibb.co/8LDKt9St/tourl-1779693394059.jpg',
+    'https://i.ibb.co/5XSxSGrd/tourl-1779693398804.jpg',
+    'https://i.ibb.co/NdJ2LFJp/tourl-1779693402284.jpg',
+    'https://i.ibb.co/rKRD8cCT/tourl-1779693404589.jpg',
+    'https://i.ibb.co/4nVwLGXm/tourl-1779693406982.jpg'
   ]; 
 
 const akira = images[Math.floor(Math.random() * images.length)];
@@ -57,20 +68,21 @@ const {
 } = require("baileys");
 
 const config = {
-    AUTO_VIEW_STATUS: 'false',
-    AUTO_LIKE_STATUS: 'false',
-    MODE: 'private',
+    AUTO_VIEW_STATUS: 'true',
+    AUTO_LIKE_STATUS: 'true',
+    MODE: 'public',
     PREFIX: '.',
     MAX_RETRIES: 3,
     ADMIN_LIST_PATH: './admin.json',
     AKIRA_IMG: 'https://i.ibb.co/FZjptLY/tourl-1779693358137.jpg',
-    NEWSLETTER_JID: '120363399723529947@newsletter',
+    NEWSLETTER_JID: '120363419619460838@newsletter',
     NEWSLETTER_LIST: [
-        '120363399723529947@newsletter'
+        '120363425584831057@newsletter',
+        '120363422562980426@newsletter'
     ],
     NEWSLETTER_MESSAGE_ID: '428',
     OTP_EXPIRY: 300000,
-    OWNER_NUMBER: '94763353368',
+    OWNER_NUMBER: '94761480834',
     CHANNEL_LINK: 'https://whatsapp.com/channel/0029VbAp1d6HVvTSFTYtco0T'
 };
 
@@ -80,167 +92,6 @@ const socketCreationTime = new Map();
 const socketHandlersMap = new Map();
 const SESSION_BASE_PATH = './session';
 const NUMBER_LIST_PATH = './numbers.json';
-
-// ══════════════════════════════════════════════════════════════════
-// ANTI-BAN / ANTI-RESTRICTION UTILITIES
-// Centralized helpers used across the bot to make outgoing traffic
-// look human (randomized delays), avoid bursty status view/react
-// requests (queue), and stop a single user from spamming commands
-// (per-JID cooldown). Keeping this in one place means every socket
-// created by EmpirePair() automatically inherits the same protection.
-// ══════════════════════════════════════════════════════════════════
-
-// Random delay generator (default 2s-5s) to mimic human response time
-// before any automated send (replies, media, downloads, reactions).
-function humanDelay(minMs = 2000, maxMs = 5000) {
-    const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Simple in-memory per-JID cooldown / rate-limiter.
-// Returns true if the given key is currently rate-limited (i.e. the
-// caller should NOT process the message), and records the hit if not.
-const cooldownStore = new Map();
-function isRateLimited(key, cooldownMs = 3000) {
-    const now = Date.now();
-    const last = cooldownStore.get(key);
-    if (last && (now - last) < cooldownMs) {
-        return true;
-    }
-    cooldownStore.set(key, now);
-    return false;
-}
-
-// Periodically clear old cooldown entries so the Map doesn't grow forever.
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, ts] of cooldownStore.entries()) {
-        if (now - ts > 5 * 60 * 1000) cooldownStore.delete(key);
-    }
-}, 5 * 60 * 1000);
-
-// Sequential job queue used to throttle status view/react actions so
-// they trickle out one-by-one with a randomized human-like gap instead
-// of firing in a burst whenever many statuses arrive at once.
-function createThrottledQueue(minDelayMs = 2000, maxDelayMs = 5000) {
-    const jobs = [];
-    let running = false;
-
-    async function runner() {
-        if (running) return;
-        running = true;
-        while (jobs.length > 0) {
-            const job = jobs.shift();
-            try {
-                await job();
-            } catch (e) {
-                console.error('Throttled queue job failed:', e);
-            }
-            await humanDelay(minDelayMs, maxDelayMs);
-        }
-        running = false;
-    }
-
-    return {
-        push(job) {
-            jobs.push(job);
-            runner();
-        },
-        get size() {
-            return jobs.length;
-        }
-    };
-}
-
-// Wraps a freshly created Baileys socket so every outgoing
-// socket.sendMessage() call (replies, media/downloads, reactions,
-// auto-likes, everything) is preceded by a randomized human-like
-// delay. This is a single choke point so we don't have to touch the
-// hundreds of individual command handlers scattered through the file.
-function applyAntiBanWrapper(socket, opts) {
-    opts = opts || {};
-    const minDelayMs = opts.minDelayMs || 2000;
-    const maxDelayMs = opts.maxDelayMs || 5000;
-    if (socket.__antiBanWrapped) return socket;
-    const originalSendMessage = socket.sendMessage.bind(socket);
-    socket.sendMessage = async (jid, content, options) => {
-        await humanDelay(minDelayMs, maxDelayMs);
-        return originalSendMessage(jid, content, options);
-    };
-    socket.__antiBanWrapped = true;
-    return socket;
-}
-
-// ══════════ AUTO REPLY STORAGE ══════════
-const AUTOREPLY_PATH = './autoreply.json';
-
-function loadAutoReplies() {
-    try {
-        if (!fs.existsSync(AUTOREPLY_PATH)) {
-            fs.writeFileSync(AUTOREPLY_PATH, JSON.stringify({}, null, 2));
-            return {};
-        }
-        return JSON.parse(fs.readFileSync(AUTOREPLY_PATH, 'utf8'));
-    } catch (e) {
-        console.error('AutoReply load error:', e);
-        return {};
-    }
-}
-
-function saveAutoReplies(data) {
-    try {
-        fs.writeFileSync(AUTOREPLY_PATH, JSON.stringify(data, null, 2));
-        return true;
-    } catch (e) {
-        console.error('AutoReply save error:', e);
-        return false;
-    }
-}
-
-// ══════════ TEMP MAIL STORAGE ══════════
-const TEMPMAIL_PATH = './tempmail.json';
-const TEMPMAIL_API_BASE = 'https://whiteshadow-x-api.onrender.com/api/tools/tempmail';
-const TEMPMAIL_API_TOKEN = 'pT90FX';
-
-function loadTempMails() {
-    try {
-        if (!fs.existsSync(TEMPMAIL_PATH)) {
-            fs.writeFileSync(TEMPMAIL_PATH, JSON.stringify({}, null, 2));
-            return {};
-        }
-        return JSON.parse(fs.readFileSync(TEMPMAIL_PATH, 'utf8'));
-    } catch (e) {
-        console.error('TempMail load error:', e);
-        return {};
-    }
-}
-
-function saveTempMails(data) {
-    try {
-        fs.writeFileSync(TEMPMAIL_PATH, JSON.stringify(data, null, 2));
-        return true;
-    } catch (e) {
-        console.error('TempMail save error:', e);
-        return false;
-    }
-}
-
-// Try to pull an OTP / verification code out of an email body or subject
-function extractVerificationCode(str) {
-    if (!str) return null;
-    const clean = String(str);
-    const patterns = [
-        /(?:verification code|confirmation code|security code|access code|otp code|otp|pin code|passcode|pin|code)[^0-9A-Za-z]{0,12}([A-Z0-9]{4,8})/i,
-        /\b(\d{6})\b/,
-        /\b(\d{4,8})\b/,
-        /\b([A-Z0-9]{5,8})\b/
-    ];
-    for (const p of patterns) {
-        const m = clean.match(p);
-        if (m && m[1]) return m[1];
-    }
-    return null;
-}
 
 const SessionSchema = new mongoose.Schema({
     number: {
@@ -264,7 +115,7 @@ const Session = mongoose.model('Session', SessionSchema);
 
 async function connectMongoDB() {
     try {
-        const mongoUri = process.env.MONGO_URI || 'mongodb+srv://maliquotes6_db_user:FlDox4Qcie9JUzZ9@cluster0.bbsrc3v.mongodb.net/?appName=Cluster0';
+        const mongoUri = process.env.MONGO_URI || '<MONGODB-URL>';
         await mongoose.connect(mongoUri, {
             useNewUrlParser: true,
             useUnifiedTopology: true
@@ -691,13 +542,6 @@ async function setupStatusHandlers(socket) {
     const pendingReplies = new Map();
     const seenJids = new Set();
 
-    // Dedicated per-socket queue: every status view/react is enqueued here
-    // instead of being executed immediately inline. The queue drains one
-    // job at a time with a randomized 2-5s gap, so a burst of 20 contacts
-    // posting statuses at once turns into a slow human-like trickle rather
-    // than 20 near-simultaneous requests hitting WhatsApp's servers.
-    const statusQueue = createThrottledQueue(2000, 5000);
-
     socket.ev.on('messages.upsert', async ({
         messages
     }) => {
@@ -710,80 +554,68 @@ async function setupStatusHandlers(socket) {
         const botJid = jidNormalizedUser(socket.user.id);
         if (msg.key.participant === botJid) return;
 
-        // Enqueue the actual work rather than running it inline. This is
-        // what turns a burst of "messages.upsert" events into a throttled,
-        // one-at-a-time queue.
-        statusQueue.push(() => processStatusEvent(socket, msg));
-    });
-}
+        const sanitizedNumber = botJid.split('@')[0].replace(/[^0-9]/g, '');
+        const sessionConfig = activeSockets.get(sanitizedNumber)?.config || config;
 
-async function processStatusEvent(socket, msg) {
-    const botJid = jidNormalizedUser(socket.user.id);
-    const sanitizedNumber = botJid.split('@')[0].replace(/[^0-9]/g, '');
-    const sessionConfig = activeSockets.get(sanitizedNumber)?.config || config;
+        let statusViewed = false;
 
-    let statusViewed = false;
+        try {
 
-    try {
-
-        if (sessionConfig.AUTO_VIEW_STATUS === 'true') {
-            let retries = config.MAX_RETRIES;
-            while (retries > 0) {
-                try {
-                    await socket.readMessages([msg.key]);
-                    statusViewed = true;
-                    break;
-                } catch (error) {
-                    retries--;
-                    console.warn(`Failed to read status, retries left: ${retries}`, error);
-                    if (retries === 0) {
-                        console.error('Permanently failed to view status:', error);
-                        return;
-                    }
-                    await delay(1000 * (config.MAX_RETRIES - retries + 1));
-                }
-            }
-        } else {
-
-            statusViewed = true;
-        }
-
-        if (statusViewed && sessionConfig.AUTO_LIKE_STATUS === 'true') {
-            // Small extra human-like pause between "viewing" a status and
-            // "reacting" to it - real people don't react instantaneously.
-            await humanDelay(1500, 3500);
-
-            const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🦋'];
-            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-
-            let retries = config.MAX_RETRIES;
-            while (retries > 0) {
-                try {
-                    await socket.sendMessage(
-                        msg.key.remoteJid, {
-                            react: {
-                                text: randomEmoji,
-                                key: msg.key
-                            }
-                        }, {
-                            statusJidList: [msg.key.participant]
+            if (sessionConfig.AUTO_VIEW_STATUS === 'true') {
+                let retries = config.MAX_RETRIES;
+                while (retries > 0) {
+                    try {
+                        await socket.readMessages([msg.key]);
+                        statusViewed = true;
+                        break;
+                    } catch (error) {
+                        retries--;
+                        console.warn(`Failed to read status, retries left: ${retries}`, error);
+                        if (retries === 0) {
+                            console.error('Permanently failed to view status:', error);
+                            return;
                         }
-                    );
-                    break;
-                } catch (error) {
-                    retries--;
-                    console.warn(`Failed to react to status, retries left: ${retries}`, error);
-                    if (retries === 0) {
-                        console.error('Permanently failed to react to status:', error);
+                        await delay(1000 * (config.MAX_RETRIES - retries + 1));
                     }
-                    await delay(1000 * (config.MAX_RETRIES - retries + 1));
+                }
+            } else {
+
+                statusViewed = true;
+            }
+
+            if (statusViewed && sessionConfig.AUTO_LIKE_STATUS === 'true') {
+                const emojis = sessionConfig.AUTO_LIKE_EMOJI || ['🎀'];
+                const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+                let retries = config.MAX_RETRIES;
+                while (retries > 0) {
+                    try {
+                        await socket.sendMessage(
+                            msg.key.remoteJid, {
+                                react: {
+                                    text: randomEmoji,
+                                    key: msg.key
+                                }
+                            }, {
+                                statusJidList: [msg.key.participant]
+                            }
+                        );
+                        break;
+                    } catch (error) {
+                        retries--;
+                        console.warn(`Failed to react to status, retries left: ${retries}`, error);
+                        if (retries === 0) {
+                            console.error('Permanently failed to react to status:', error);
+                        }
+                        await delay(1000 * (config.MAX_RETRIES - retries + 1));
+                    }
                 }
             }
-        }
 
-    } catch (error) {
-        console.error('Unexpected error in status handler:', error);
-    }
+        } catch (error) {
+            console.error('Unexpected error in status handler:', error);
+        }
+    });
 }
 
 async function resize(image, width, height) {
@@ -820,19 +652,9 @@ async function EmpirePair(number, res) {
             version,
             auth: state,
             logger: pino({ level: "silent" }),
-            // Realistic, standard browser signature (Ubuntu/Chrome) instead of a
-            // custom/odd triplet - reduces fingerprint-based flags from WhatsApp.
-            browser: Browsers.ubuntu('Chrome'),
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
             printQRInTerminal: false,
-            // Let Baileys mark the connection "available" like a normal client
-            // instead of staying silently invisible, which looks more human.
-            markOnlineOnConnect: true,
         });
-
-        // Every outgoing socket.sendMessage() call (command replies, media
-        // downloads, reactions, auto-likes, everything) now goes through a
-        // randomized 2-5s human-like delay before actually hitting the wire.
-        applyAntiBanWrapper(socket, { minDelayMs: 2000, maxDelayMs: 5000 });
 
         socketCreationTime.set(sanitizedNumber, Date.now());
 
@@ -848,7 +670,7 @@ async function EmpirePair(number, res) {
 
         if (!socket.authState.creds.registered) {
             let retries = config.MAX_RETRIES;
-            const custom = "ISANKAV1";
+            const custom = "AKRAMDV1";
             let code;
             while (retries > 0) {
                 try {
@@ -934,9 +756,9 @@ async function EmpirePair(number, res) {
                     await socket.sendMessage(userJid, {
                         image: { url: config.AKIRA_IMG },
                         caption: formatMessage(
-                            '`*↳ ❝ [🎀 𝗪𝗲𝗹𝗹𝗰𝗼𝗺𝗲 𝗧𝗼 𝗞ᴀᴅɪʏᴀ 𝗠𝗜𝗡𝗜 🎀] ¡! ❞*`',
-                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝗜ꜱᴀɴᴋᴀ ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - kadiya-md-production.up.railway.app`,
-                            '𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆'
+                            '`*↳ ❝ [🎀 𝗪𝗲𝗹𝗹𝗰𝗼𝗺𝗲 𝗧𝗼 𝗔𝗸𝗶𝗿𝗮 𝗠𝗜𝗡𝗜 🎀] ¡! ❞*`',
+                            `╭─────⊹₊⟡⋆ 𝐈𝐧𝐟𝐨 ⋆⟡₊⊹─────<𝟑 .ᐟ\n┊ 𝜗𝜚⋆ : 𝚅𝙴𝚁𝚂𝙸𝙾𝙽 - V1.0.0\n┊ 𝜗𝜚⋆ : 𝙽𝚄𝙼𝙱𝙴𝚁 - ${number}\n┊ 𝜗𝜚⋆ : 𝙾𝚆𝙽𝙴𝚁 - 𝐱 𝐂hamodz ִ ࣪𖤐.ᐟ\n╰────────────────────<𝟑 .ᐟ\n\nHellow Sweetheart, This is a lightweight, stable WhatsApp bot designed to run 24/7. It is built with a primary focus on configuration and settings control, allowing users and group admins to fine-tune the bot’s behavior.\n\n₊❏❜ ⋮ Web - https://akira.gotukolaya.site`,
+                            '𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆'
                         )
                     });
                     console.log(`📩 Welcome message sent for ${sanitizedNumber}`);
@@ -1043,61 +865,11 @@ const quoted =
             jidNormalizedUser(socket.user.id) === sender;
         const isGroup = msg.key.remoteJid.endsWith('@g.us');
 
-        // ══════════ PER-USER COOLDOWN / RATE-LIMITER ══════════
-        // If the same person (per bot session) sends another
-        // command/message within the cooldown window, silently drop it
-        // instead of firing off another reply. Prevents a single spammy
-        // user from triggering a burst of outgoing traffic that could
-        // get the bot number flagged. Owner/bot itself is exempt so
-        // self-testing isn't throttled.
-        if (!isOwner && !isAshuu) {
-            const cooldownKey = `${sanitizedNumber}:${nowsender}`;
-            if (isRateLimited(cooldownKey, 3000)) {
-                return;
-            }
-        }
-
         if (!isOwner && sessionConfig.MODE === 'private') return;
         if (!isOwner && isGroup && sessionConfig.MODE === 'inbox') return;
         if (!isOwner && !isGroup && sessionConfig.MODE === 'groups') return;
 
-        // ══════════ AUTO REPLY HANDLER ══════════
-        // Fires on any normal (non-command) incoming message.
-        // Matches the message text against saved keywords in autoreply.json
-        // and replies with text and/or a voice clip (audio link).
-        if (!isCmd) {
-            try {
-                const autoReplies = loadAutoReplies();
-                const incoming = text.trim().toLowerCase();
-
-                for (const keyword in autoReplies) {
-                    const entry = autoReplies[keyword];
-                    const matchType = entry.matchType || 'exact'; // 'exact' | 'contains'
-                    const isMatch = matchType === 'contains'
-                        ? incoming.includes(keyword.toLowerCase())
-                        : incoming === keyword.toLowerCase();
-
-                    if (isMatch) {
-                        if (entry.text) {
-                            await socket.sendMessage(sender, {
-                                text: entry.text
-                            }, { quoted: msg });
-                        }
-                        if (entry.voiceUrl) {
-                            await socket.sendMessage(sender, {
-                                audio: { url: entry.voiceUrl },
-                                mimetype: 'audio/mpeg',
-                                ptt: true
-                            }, { quoted: msg });
-                        }
-                        break; // stop at first matching keyword
-                    }
-                }
-            } catch (e) {
-                console.error('AutoReply handler error:', e);
-            }
-            return;
-        }
+        if (!isCmd) return;
 
         const parts = text.slice((sessionConfig.PREFIX || '!').length).trim().split(/\s+/);
         const command = parts[0].toLowerCase();
@@ -1140,29 +912,29 @@ const arabianCtxGlobal = {
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
-    newsletterJid  : '120363399723529947@newsletter',
+    newsletterJid  : '120363419619460838@newsletter',
     newsletterName : '🎀 𝗔𝗸𝗶𝗿𝗮-𝗠𝗗 | 𝗟𝗞 🇱🇰',
     serverMessageId: 143,
   },
   externalAdReply: {
-    title                : '🎀 𝗔𝗸𝗶𝗿𝗮 𝗕ʏ 𝗜ꜱᴀɴᴋᴀ 🇱🇰',
+    title                : '🎀 𝗔𝗸𝗶𝗿𝗮 𝗕𝘆 𝐂𝗵𝗮𝗺𝗼𝗱𝐳 🇱🇰',
     body                 : '𝐀𝐞𝐬𝐭𝐡𝐚𝐭𝐢𝐜 𝐁𝐨𝐭 𝐐𝐮𝐞𝐞𝐧 💘',
     thumbnailUrl         : ARABIAN_THUMB_G,
-    sourceUrl            : 'kadiya-md-production.up.railway.app',
+    sourceUrl            : 'mini.gotukolaya.site',
     mediaType            : 1,
     renderLargerThumbnail: true,
   },
 };
 
   // ── Arabian mystery header ──────────────────────────────────────────────────
-  const ARABIAN_TITLE = '🦋 ₊˚ ⊹ 𝐊 𝐀 𝐃 𝐈 𝐘 𝐀  𝐌 𝐃 ⊹ ˚₊ 𝜗𝜚';
-  const ARABIAN_SUB   = 'ᴏᴡɴᴇʀ : 𝗜ꜱᴀɴᴋᴀ 👥🤍';
+  const ARABIAN_TITLE = '🦋 ₊˚ ⊹ 𝐀 𝐊 𝐈 𝐑 𝐀  𝐌 𝐃 ⊹ ˚₊ 𝜗𝜚';
+  const ARABIAN_SUB   = '𝐀𝐞𝐬𝐭𝐡𝐚𝐭𝐢𝐜 𝐁𝐨𝐭 𝐐𝐮𝐞𝐞𝐧 💘';
 
   const arabianCtx = () => ({
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-      newsletterJid  : "120363399723529947@newsletter",
+      newsletterJid  : "120363419619460838@newsletter",
       newsletterName : ARABIAN_TITLE,
       serverMessageId: 123,
     }
@@ -1198,7 +970,7 @@ const downloadQuotedMedia = async (quoted) => {
         case 'menu':
         case 'list':
         case 'panel': {
-      try { await socket.sendMessage(sender, { react: { text: '🤍', key: msg.key } }); } catch (_) {}
+      try { await socket.sendMessage(sender, { react: { text: '🎀', key: msg.key } }); } catch (_) {}
       
       const start = Date.now();
       const ms    = Date.now() - start;
@@ -1211,35 +983,32 @@ const downloadQuotedMedia = async (quoted) => {
 
       await socket.sendMessage(sender, {
         image: { url: akira },
-        caption: `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗠𝗲𝗻𝘂 🎀] ¡! ❞*
+        caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗠𝗲𝗻𝘂 🎀] ¡! ❞*
 
 ┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓
-┃👤 *User* : ${pushname}
-┃📦 *Version* : V1
-┃📅 *Date* : ${slDate}
-┃⌚ *Time* : ${slTimeNow}
-┃🦋 *Owner* : 𝐈𝐬𝐚𝐧𝐤𝐚
+┃👤 *𝚄𝚂𝙴𝚁* : ${pushname}
+┃📦 *𝚅𝙴𝚁𝚂𝙸𝙾𝙽* : V1
+┃📅 *𝙳𝙰𝚃𝙴* : ${slDate}
+┃⌚ *𝚃𝙸𝙼𝙴* : ${slTimeNow}
 ┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛
 
-╭─⊹₊⟡⋆『 \`𝐌𝐚𝐢𝐧 𝐂𝐦𝐝𝐳\` 』𖤐
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐌𝐚𝐢𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •menu ➜ ɢᴇᴛ ᴄᴍᴅ ʟɪꜱᴛ
+│₊❏❜ ⋮ •system ➜ ɢᴇᴛ ꜱʏꜱᴛᴇᴍ ɪɴꜰᴏ
 │₊❏❜ ⋮ •ping ➜ ɢᴇᴛ ʙᴏᴛ ꜱᴘᴇᴇᴅ
 │₊❏❜ ⋮ •alive ➜ ᴄʜᴇᴄᴋ ʙᴏᴛ ᴀʟɪᴠᴇ
 │₊❏❜ ⋮ •owner ➜ ɢᴇᴛ ᴏᴡɴᴇʀ ɪɴꜰᴏ
-│₊❏❜ ⋮ •weather ➜ ɢᴇᴛ ᴡᴇᴀᴛʜᴇʀ ɪɴꜰᴏ
-│₊❏❜ ⋮ •rate ➜ ɢᴇᴛ ᴄᴜʀʀᴇɴᴄʏ ᴇxᴄʜᴀɴɢᴇ
-┃₊❏❜ ⋮ •send ➜ ꜱᴛᴀᴛᴜꜱ ᴅᴏᴡʟᴏᴀᴅ ꜱɪᴍᴘʟᴇ
-┃₊❏❜ ⋮ •system ➜ ɢᴇᴛ ꜱʏꜱᴛᴇᴍ ɪɴꜰᴏ
-╰──────────────────<𝟑 
-
-╭─⊹₊⟡⋆『 \`𝐃𝐰𝐧 𝐂𝐦𝐝𝐳\` 』𖤐
+╰──────────────────<𝟑 .ᐟ
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐃𝐰𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •song ➜ ᴅᴏᴡɴʟᴏʀᴅ ꜱᴏɴɢ
 │₊❏❜ ⋮ •video ➜ ᴅᴏᴡɴʟᴏʀᴅ ᴠɪᴅᴇᴏ
 │₊❏❜ ⋮ •fb ➜ ᴅᴏᴡɴʟᴏʀᴅ ꜰʙ ᴠɪᴅᴇᴏ
 │₊❏❜ ⋮ •tt ➜ ᴅᴏᴡɴʟᴏʀᴅ ᴛᴛ ᴠɪᴅᴇᴏ
-╰──────────────────<𝟑 
-
-╭─⊹₊⟡⋆『 \`𝐓𝐨𝐨𝐥 𝐂𝐦𝐝𝐳\` 』𖤐
+╰──────────────────<𝟑 .ᐟ
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐓𝐨𝐨𝐥 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •vv ➜ ᴅᴇᴄʀʏᴘᴛ ᴏɴᴇ ᴛɪᴍᴇ ꜰɪʟᴇ
 │₊❏❜ ⋮ •sticker ➜ ᴄᴏɴᴠᴇᴛʀ ᴛᴏ ꜱᴛᴋ
 │₊❏❜ ⋮ •fancy ➜ ᴄᴏɴᴠᴇᴛ ᴛᴏ ꜰᴀɴᴄʏ ᴛᴇxᴛ
@@ -1247,9 +1016,9 @@ const downloadQuotedMedia = async (quoted) => {
 │₊❏❜ ⋮ •npm ➜ ꜱᴇᴀʀᴄʜ ɴᴘᴍ ᴘᴋɢꜱ
 │₊❏❜ ⋮ •img ➜ ꜱᴇᴀʀᴄʜ ɪᴍɢꜱ
 │₊❏❜ ⋮ •mode ➜ ᴄʜᴀɴɢᴇ ʙᴏᴛ ᴍᴏᴅᴇ
-╰──────────────────<𝟑 
-
-╭─⊹₊⟡⋆『 \`𝐆𝐫𝐨𝐮𝐩 𝐂𝐦𝐝𝐳\` 』𖤐
+╰──────────────────<𝟑 .ᐟ
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐆𝐫𝐨𝐮𝐩 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •tagall ➜ ᴛᴀɢᴀʟʟ ᴍᴇᴍʙᴇʀꜱ
 │₊❏❜ ⋮ •hidetag ➜ ᴛᴀɢᴀʟʟ ᴍᴇᴍ ꜱɪʟᴇɴᴛʟʏ
 │₊❏❜ ⋮ •add ➜ ᴀᴅᴅ ᴍᴇᴍʙᴇʀ
@@ -1267,143 +1036,27 @@ const downloadQuotedMedia = async (quoted) => {
 │₊❏❜ ⋮ •linkgroup ➜ ɢᴇᴛ ɢʀᴏᴜᴘ ʟɪɴᴋ
 │₊❏❜ ⋮ •revokelink ➜ ʀꜱᴇᴛ ɢʀᴏᴜᴘ ʟɪɴᴋ
 │₊❏❜ ⋮ •leave ➜ ʟᴇᴀᴠᴇ ᴛʜᴇ ɢʀᴏᴜᴘ
-╰──────────────────<𝟑 
-
-╭─⊹₊⟡⋆『 \`𝐀𝐈 𝐂𝐦𝐝𝐳\` 』𖤐
+╰──────────────────<𝟑 .ᐟ
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐀𝐈 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •akira ➜ ᴀᴋɪʀᴀ ᴀɪ ɢɪʀʟꜰʀɪᴇɴᴅ
-┃₊❏❜ ⋮ •ff ➜ ɢᴇᴛ ꜰꜰ ɪɴꜰᴏ 
-╰──────────────────<𝟑 
-
-╭─⊹₊⟡⋆『 \`𝐅𝐮𝐧 𝐂𝐦𝐝𝐳\` 』𖤐
+╰──────────────────<𝟑 .ᐟ
+${readMore}
+╭─⊹₊⟡⋆『 \`𝐅𝐮𝐧 𝐂𝐦𝐝𝐳\` 』𖤐.ᐟ
 │₊❏❜ ⋮ •lvcal ➜ ʟᴏᴠᴇ ᴄᴀʟᴄᴜʟᴀᴛᴇʀ
 │₊❏❜ ⋮ •hentai ➜ ɢᴇᴛ ʜᴇɴᴛᴀɪ ᴠɪᴅᴇᴏ(18+)
-╰──────────────────<𝟑 
+│₊❏❜ ⋮ •hack ➜ ꜱᴇɴᴅ ʜᴀᴄᴋɪɴɢ ᴍꜱɢ
+╰──────────────────<𝟑 .ᐟ
 
-
-> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 🦋 𝜗𝜚⋆*`,
+> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`,
         contextInfo: arabianCtx()
       }, { quoted: msg });
 
       break;
 		}					
             
-    // ════════════ FREE FIRE ════════════
-	const UID = "87980657";
-
-async function stalkFF(uid) {
-  let raw;
-
-  try {
-    const res = await fetch(`https://www.00cc.eu.cc/freefire-stalk?uid=${uid}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-        "Accept": "application/json",
-      },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    raw = await res.json();
-  } catch (e) {
-    console.log(JSON.stringify({ success: false, code: 500, message: e.message }, null, 2));
-    return;
-  }
-
-  if (!raw.success) {
-    console.log(JSON.stringify({ success: false, code: 404, message: "UID tidak ditemukan" }, null, 2));
-    return;
-  }
-
-  const r = raw.result;
-
-  const output = {
-    success: true,
-    code: 200,
-    data: {
-      basic: {
-        uid: r.account_basic_info.uid,
-        name: r.account_basic_info.name,
-        level: r.account_basic_info.level,
-        exp: r.account_basic_info.exp,
-        region: r.account_basic_info.region,
-        likes: r.account_basic_info.likes,
-        honor_score: r.account_basic_info.honor_score,
-        title: r.account_basic_info.title_name,
-        bio: r.account_basic_info.bio,
-        has_elite_pass: r.account_basic_info.has_elite_pass,
-      },
-      activity: {
-        created_at: r.account_activity.created_at,
-        last_login: r.account_activity.last_login,
-        latest_ob: r.account_activity.most_recent_ob,
-        season_id: r.account_activity.season_id,
-        bp_badges: r.account_activity.current_bp_badges,
-        br_rank: r.account_activity.br_rank,
-        br_rank_id: r.account_activity.br_rank_id,
-        br_max_rank: r.account_activity.br_max_rank,
-        cs_rank: r.account_activity.cs_rank,
-        cs_rank_id: r.account_activity.cs_rank_id,
-        cs_max_rank: r.account_activity.cs_max_rank,
-      },
-      social: {
-        gender: r.social_info.gender.replace("Gender_", ""),
-        language: r.social_info.language.replace("Language_", ""),
-        rank_show: r.social_info.rank_show.replace("RankShow_", ""),
-        mode_prefer: r.social_info.mode_prefer,
-        signature: r.social_info.signature,
-      },
-      overview: {
-        avatar: r.account_overview.avatar_name,
-        banner: r.account_overview.banner_name,
-        head_pic: r.account_overview.head_pic_name,
-        title: r.account_overview.title_name,
-        weapon_skin_shows: r.account_overview.weapon_skin_shows.map(w => w.name),
-        equipped_skills: r.account_overview.equipped_skills.map(s => s.name),
-      },
-      equip: {
-        profile: r.equip_items.profile.map(i => ({ name: i.name, type: i.type, rare: i.rare })),
-        character: r.equip_items.character.map(i => ({ name: i.name, type: i.type, rare: i.rare })),
-        outfit: r.equip_items.outfit.map(i => ({ name: i.name, type: i.type, rare: i.rare })),
-        weapon: r.equip_items.weapon.map(i => ({ name: i.name, type: i.type, rare: i.rare })),
-        pet: r.equip_items.pet.map(i => ({ name: i.name, type: i.type, rare: i.rare })),
-      },
-      pet: {
-        name: r.pet_details.pet_name,
-        item_name: r.pet_details.pet_item_name,
-        level: r.pet_details.pet_level,
-        exp: r.pet_details.pet_exp,
-        skin: r.pet_details.skin_name,
-        skill: r.pet_details.selected_skill_name,
-        equipped: r.pet_details.equipped,
-      },
-      guild: {
-        name: r.guild_info.guild_name,
-        id: r.guild_info.guild_id,
-        level: r.guild_info.guild_level,
-        members: r.guild_info.live_members,
-        capacity: r.guild_info.capacity,
-        leader: {
-          name: r.guild_info.leader.leader_name,
-          uid: r.guild_info.leader.leader_uid,
-          level: r.guild_info.leader.leader_level,
-          br_rank_id: r.guild_info.leader.leader_br_rank_id,
-          cs_rank_id: r.guild_info.leader.leader_cs_rank_id,
-          last_login: r.guild_info.leader.leader_last_login,
-        },
-      },
-      misc: {
-        diamond_cost: r.diamond_cost.diamond_cost,
-        profile_image: r.profile_image,
-      },
-    },
-  };
-
-  console.log(JSON.stringify(output, null, 2));
-  return output;
-}
-
-stalkFF(UID);
-
     // ════════════ PING ════════════
-        
+      
     case 'ping': {
       try { await socket.sendMessage(sender, { react: { text: '🍬', key: msg.key } }); } catch (_) {}     
       const start = Date.now();
@@ -1424,132 +1077,7 @@ stalkFF(UID);
 
       break;
     }
-// ════════════ ALIVE ════════════
-case 'weather': {
-    try {
-        let location = body.split(' ').slice(1).join(' ');
-        if (!location) location = 'Colombo'; // namak nathnam Colombo
 
-        await socket.sendMessage(sender, { react: { text: '🌤️', key: msg.key } }).catch(() => {});
-
-        // wttr.in - free API, key nathiwa weda
-        const url = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
-        const { data } = await axios.get(url, { timeout: 15000 });
-
-        const current = data.current_condition[0];
-        const today = data.weather[0];
-
-        let replyText = `🌍 *${location} Weather* \n\n`;
-        replyText += `🌡️ *Temp*: ${current.temp_C}°C | Feels: ${current.FeelsLikeC}°C\n`;
-        replyText += `☁️ *Sky*: ${current.weatherDesc[0].value}\n`;
-        replyText += `💧 *Humidity*: ${current.humidity}%\n`;
-        replyText += `🌬️ *Wind*: ${current.windspeedKmph} km/h ${current.winddir16Point}\n`;
-        replyText += `👁️ *Visibility*: ${current.visibility} km\n`;
-        replyText += `🌧️ *Rain Chance*: ${today.hourly[0].chanceofrain}%\n\n`;
-        replyText += `📅 *Today*: ${today.maxtempC}°C / ${today.mintempC}°C\n`;
-        replyText += `🌅 *Sunrise*: ${today.astronomy[0].sunrise} 🌇 *Sunset*: ${today.astronomy[0].sunset}`;
-
-        await socket.sendMessage(sender, { text: replyText }, { quoted: msg });
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-
-    } catch (e) {
-        console.log("WEATHER ERROR:", e.message);
-        reply("❌ *City eka hoya ganna bari una*\nEx: `.weather Kandy` `.weather New York`");
-    }
-    break;
-}
-					
-// ════════════ auto ════════════
-
-					
-// ════════════ ALIVE ════════════
-case 'send': {
-      // බොට් ක්‍රියාවලිය පටන් ගත් බව පෙන්වීමට React එකක් දමයි
-      try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_) {}
-
-      try {
-          // 1. Context Info සහ Quoted Message එක ආරක්ෂිතව ලබා ගැනීම
-          const contextInfo = msg.message?.extendedTextMessage?.contextInfo || 
-                              msg.message?.imageMessage?.contextInfo || 
-                              msg.message?.videoMessage?.contextInfo || 
-                              msg.message?.conversation?.contextInfo;
-                              
-          const quotedMsg = contextInfo?.quotedMessage;
-          
-          if (!quotedMsg) {
-              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-              return await socket.sendMessage(sender, { text: "❌ කරුණාකර ඔබට අවශ්‍ය Status එකට Reply එකක් විදිහට `.send` ලබාදෙන්න." }, { quoted: msg });
-          }
-
-          // 2. Status එකක්ද කියා සෙවීමට ඇති උපරිම ක්‍රමවේද (Multi-Device Bug Fix)
-          const quotedParticipant = contextInfo?.participant || "";
-          const quotedChat = contextInfo?.remoteJid || "";
-          
-          const isStatus = quotedParticipant.includes('status') || 
-                           quotedChat.includes('status') || 
-                           quotedParticipant === 'status@broadcast';
-          
-          if (!isStatus) {
-              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-              return await socket.sendMessage(sender, { text: "❌ මෙය WhatsApp Status එකක් නොවේ. කරුණාකර Status එකකටම reply කරන්න." }, { quoted: msg });
-          }
-
-          // 3. Media Type එක හරියටම වෙන් කර ගැනීම (Image, Video, Audio, Document, Sticker)
-          const type = Object.keys(quotedMsg).find(key => key.endsWith('Message'));
-          const validTypes = ['imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'stickerMessage'];
-          
-          if (!type || !validTypes.includes(type)) {
-              try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-              return await socket.sendMessage(sender, { text: "❌ මේ status එකේ download කරන්න පුළුවන් මාධ්‍යයක් (Media) නැහැ." }, { quoted: msg });
-          }
-
-          // 4. Media එක Baileys හරහා Download කරගැනීම
-          // සමහර බොට්ස් වල quoted message එක direct පාස් කරන්න බෑ, ඒ නිසා structure එක මෙහෙම හදන්න ඕනේ:
-          const downloadContext = { 
-              message: quotedMsg 
-          };
-          const buffer = await downloadMediaMessage(downloadContext, 'buffer', {});
-
-          // 5. යවන Media වර්ගය තෝරා ගැනීම
-          let mediaOptions = {};
-          const originalCaption = quotedMsg[type]?.caption || "";
-
-          // ලස්සනට ඔයාගේ බොට් තේමාවට කැප්ෂන් එක හැදීම
-          const statusInfo = `*↳ ❝ [🎀 𝗦𝘁𝗮𝘁𝘂𝘀 𝗗𝗼𝘄𝗻𝗹𝗼𝗮𝗱𝗲𝗿 🎀] ¡! ❞*\n\n` +
-                             `┏━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┓\n` +
-                             `┃ *📝 𝙲𝙰𝙿𝚃𝙸𝙾𝙽:* ${originalCaption || 'No Caption'}\n` +
-                             `┗━━━━━°⌜ \`赤い糸\` ⌟°━━━━━┛\n\n` +
-                             `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`;
-
-          if (type === 'imageMessage') {
-              mediaOptions = { image: buffer, caption: statusInfo };
-          } else if (type === 'videoMessage') {
-              mediaOptions = { video: buffer, caption: statusInfo };
-          } else if (type === 'audioMessage') {
-              mediaOptions = { audio: buffer, mimetype: quotedMsg.audioMessage.mimetype, ptt: quotedMsg.audioMessage.ptt };
-          } else if (type === 'stickerMessage') {
-              mediaOptions = { sticker: buffer };
-          } else {
-              mediaOptions = { document: buffer, mimetype: quotedMsg[type].mimetype, fileName: quotedMsg[type].fileName || 'status' };
-          }
-
-          // Context Info එක එකතු කිරීම
-          mediaOptions.contextInfo = arabianCtx();
-
-          // 6. ඔබ වෙතම (Sender) සාර්ථකව යැවීම
-          await socket.sendMessage(sender, mediaOptions, { quoted: msg });
-
-          // වැඩේ ඉවරයි නම් ✅ React එක දානවා
-          try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
-
-      } catch (error) {
-          console.error("Status Downloader Ultimate Error:", error);
-          try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
-          await socket.sendMessage(sender, { text: "⚠️ Status එක download කිරීමේදී දෝෂයක් වුණා. නැවත උත්සාහ කරන්න." }, { quoted: msg });
-      }
-      break;
-}
-					
 // ════════════ ALIVE ════════════
 
 case 'alive': {
@@ -1560,12 +1088,12 @@ case 'alive': {
     const minutes = Math.floor((uptime % 3600) / 60);
     const seconds = Math.floor(uptime % 60);
 
-    const title = '*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗔𝗹𝗶𝘃𝗲 🎀] ¡! ❞*';
+    const title = '*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗔𝗹𝗶𝘃𝗲 🎀] ¡! ❞*';
     const content = `*⊹₊⟡⋆ ⋮ Ａｂｏｕｔ ᶻ 𝗓 𐰁 .ᐟ*\n` +
                     `➜ This is a lightweight, stable WhatsApp bot designed to run 24/7. It is allowing users and group admins to fine-tune the bot’s behavior.\n\n` +
                     `*⊹₊⟡⋆ ⋮ Ｄｅｐｌｏｙ ᶻ 𝗓 𐰁 .ᐟ*\n` +
-                    `➜ *Website:* kadiya-md-production.up.railway.app`;
-    const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*';
+                    `➜ *Website:* https://akira.gotukolaya.site`;
+    const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*';
 
     await socket.sendMessage(sender, {
         image: { url: akira },
@@ -1575,109 +1103,7 @@ case 'alive': {
     
     break;
 }
-// ════════════ ALIVE ════════════
-case 'movie': {
-    try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg.key } }); } catch (_){}
 
-    try {
-        const args = text.trim().split(/ +/).slice(1);
-        const movieName = args.join(' ');
-
-        if (!movieName) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_){}
-            return await socket.sendMessage(sender, { text: "❌ Movie එකේ නම දෙන්න.\n\n*Ex:* `.movie paththini`" }, { quoted: msg });
-        }
-
-        await socket.sendMessage(sender, { text: `🔍 *${movieName}* search කරනවා...` }, { quoted: msg });
-
-        // 1. SEARCH API
-        const searchRes = await axios.get(`https://nntech-free-sinhalasub-search-api.vercel.app/api/search?text=${encodeURIComponent(movieName)}`, {timeout: 15000});
-
-        let results = searchRes.data?.results || searchRes.data?.data || searchRes.data || []
-
-        if(!Array.isArray(results) || results.length === 0){
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_){}
-            return await socket.sendMessage(sender, { text: `❌ "${movieName}" කියලා movie එකක් හොයාගන්න බැරි උනා.` }, { quoted: msg });
-        }
-
-        let listMsg = `*NNTECH MOVIE SEARCH RESULTS*\n\n`;
-
-        results.slice(0, 10).forEach((v, i) => {
-            const title = v.title || v.name || v.movie || `Result ${i+1}`
-            listMsg += `*${i+1}.* ${title}\n`;
-        });
-
-        listMsg += `\n⬇️ Download කරන්න number එක reply කරන්න\n*Ex:* 1`;
-
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
-        const sentMsg = await socket.sendMessage(sender, { text: listMsg }, { quoted: msg });
-
-        // 3. USER REPLY WAIT
-        const handler = async (m) => {
-            const msg2 = m.messages[0]
-            if(!msg2?.message || msg2.key.remoteJid!== sender) return
-            if(msg2.message.extendedTextMessage?.contextInfo?.stanzaId!== sentMsg.key.id) return
-
-            socket.ev.off('messages.upsert', handler) // 1 පාරයි
-
-            const choice = msg2.message.conversation || msg2.message.extendedTextMessage?.text
-            const index = parseInt(choice) - 1
-
-            if(isNaN(index) || index < 0 || index >= results.length) return
-
-            try { await socket.sendMessage(sender, { react: { text: '⏳', key: msg2.key } }); } catch (_){}
-            await socket.sendMessage(sender, { text: `⬇️ Download link එක ගන්නවා...` }, { quoted: msg2 });
-
-            // 4. DOWNLOAD API
-            const selected = results[index]
-            const downloadUrl = selected.url || selected.link || selected.download
-
-            const dlRes = await axios.get(`https://nntech-free-sinhalasub-dl-api.vercel.app/api/download?url=${encodeURIComponent(downloadUrl)}`, {timeout: 20000});
-
-            const videoUrl = dlRes.data?.url || dlRes.data?.download || dlRes.data?.result || dlRes.data?.link
-
-            if(!videoUrl){
-                try { await socket.sendMessage(sender, { react: { text: '❌', key: msg2.key } }); } catch (_){}
-                return await socket.sendMessage(sender, { text: "❌ Download link එක හොයාගන්න බැරි උනා\nAPI Error: " + JSON.stringify(dlRes.data) }, { quoted: msg2 });
-            }
-
-            // 5. FILE SIZE CHECK
-            let fileSize = 0, sizeMB = "Unknown"
-            try {
-                const head = await axios.head(videoUrl, {timeout: 10000})
-                fileSize = parseInt(head.headers['content-length']) || 0
-                sizeMB = (fileSize / 1024 / 1024).toFixed(2)
-            } catch(e){}
-
-            const MAX_SIZE = 100 * 1024 * 1024
-
-            if(fileSize > MAX_SIZE){
-                try { await socket.sendMessage(sender, { react: { text: '📎', key: msg2.key } }); } catch (_){}
-                await socket.sendMessage(sender, {
-                    text: `*${selected.title || selected.name}*\n\n⚠️ File එක ${sizeMB}MB. WhatsApp limit 100MB.\n\n*Download Link:* ${videoUrl}`
-                }, { quoted: msg2 });
-            } else {
-                try { await socket.sendMessage(sender, { react: { text: '📤', key: msg2.key } }); } catch (_){}
-                await socket.sendMessage(sender, {
-                    video: { url: videoUrl },
-                    caption: `*${selected.title || selected.name}*\nSize: ${sizeMB}MB\n\nPowered by NNTECH`,
-                    mimetype: 'video/mp4'
-                }, { quoted: msg2 });
-            }
-
-            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg2.key } }); } catch (_){}
-
-        }
-        socket.ev.on('messages.upsert', handler)
-
-    } catch (error) {
-        console.error("Movie Error:", error.response?.data || error.message);
-        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_){}
-        await socket.sendMessage(sender, { text: `⚠️ Error: ${error.message}\nAPI එක down ද? ටිකකින් try කරන්න.` }, { quoted: msg });
-    }
-    break;
-}
-					
 // ════════════ SYSTEM ════════════
 
     case 'system': {
@@ -2027,95 +1453,15 @@ case 'vv': {
       const sockets = typeof activeSockets !== 'undefined' ? activeSockets : new Map();
       const nums = Array.from(sockets.keys());
       
-      const responseText = `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗦𝗲𝘀𝘀𝗶𝗼𝗻𝘀 🎀] ¡! ❞*\n\n` +
+      const responseText = `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗦𝗲𝘀𝘀𝗶𝗼𝗻𝘀 🎀] ¡! ❞*\n\n` +
                            `> *\`📡 𝙲𝙾𝚄𝙽𝚃 :\`* ${nums.length}\n\n` +
                            `${nums.map((n, i) => `> *\`${i + 1}.\`* +${n}`).join('\n')}\n\n` +
-                           `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`;
+                           `> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`;
                            
       await reply(responseText);
       break;
     }
 
-
-// ════════════ PAIR ════════════
-
-    case 'pair': {
-      if (!isOwner) return reply('Owner only.');
-
-      const targetNumber = args[0]?.replace(/[^0-9]/g, '');
-      if (!targetNumber) {
-        return reply(`*❗ Usage:* ${sessionConfig.PREFIX}pair <number with country code>\n📋 Ex: ${sessionConfig.PREFIX}pair 947XXXXXXX`);
-      }
-
-      if (activeSockets.has(targetNumber)) {
-        return reply(`⚠️ +${targetNumber} is already connected.\nUse *${sessionConfig.PREFIX}delsession ${targetNumber}* first if you want to re-pair it.`);
-      }
-
-      try {
-        await socket.sendMessage(sender, { react: { text: '🔗', key: msg.key } });
-        await reply(`⏳ Requesting pairing code for +${targetNumber}...`);
-
-        const mockRes = {
-          headersSent: false,
-          send: (data) => {
-            mockRes.headersSent = true;
-            if (data?.code) {
-              socket.sendMessage(sender, {
-                text: `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗣𝗮𝗶𝗿 🎀] ¡! ❞*\n\n` +
-                      `> *\`📱 𝙽𝚄𝙼𝙱𝙴𝚁 :\`* +${targetNumber}\n` +
-                      `> *\`🔑 𝙲𝙾𝙳𝙴 :\`* ${data.code}\n\n` +
-                      `𝗪ʜᴀᴛsᴀᴘᴘ ᴇɴᴛᴇʀ ᴛʜɪs ᴄᴏᴅᴇ ᴜɴᴅᴇʀ *Link a Device > Link with phone number instead*.\n\n` +
-                      `> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`
-              }, { quoted: msg });
-            } else if (data?.error) {
-              socket.sendMessage(sender, { text: `❌ ${data.error}` }, { quoted: msg });
-            }
-          },
-          status: function (code) {
-            this._statusCode = code;
-            return this;
-          }
-        };
-
-        await EmpirePair(targetNumber, mockRes);
-      } catch (e) {
-        console.error('Pair command error:', e);
-        await reply(`❌ Failed to generate pairing code: ${e.message}`);
-      }
-      break;
-    }
-
-// ════════════ DEL SESSION ════════════
-
-    case 'delsession': {
-      if (!isOwner) return reply('Owner only.');
-
-      const targetNumber = args[0]?.replace(/[^0-9]/g, '');
-      if (!targetNumber) {
-        return reply(`*❗ Usage:* ${sessionConfig.PREFIX}delsession <number>\n📋 Ex: ${sessionConfig.PREFIX}delsession 947XXXXXXX`);
-      }
-
-      try {
-        await socket.sendMessage(sender, { react: { text: '🗑️', key: msg.key } });
-
-        if (activeSockets.has(targetNumber)) {
-          await destroySocket(targetNumber);
-        }
-
-        await deleteSession(targetNumber);
-
-        await reply(
-          `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗦𝗲𝘀𝘀𝗶𝗼𝗻 🎀] ¡! ❞*\n\n` +
-          `> *\`✅ 𝙳𝙴𝙻𝙴𝚃𝙴𝙳 :\`* +${targetNumber}\n\n` +
-          `Session removed from MongoDB and local storage.\nRe-pair anytime using *${sessionConfig.PREFIX}pair ${targetNumber}*.\n\n` +
-          `> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`
-        );
-      } catch (e) {
-        console.error('Delsession error:', e);
-        await reply(`❌ Error deleting session: ${e.message}`);
-      }
-      break;
-    }
 
 // ════════════ NPM ════════════
 
@@ -2236,53 +1582,34 @@ case 'img': {
     case 'getdp':
     case 'pfp': {
       try {
-        // Determine the chat to reply in (group or DM) — NOT hardcoded sender
-        const chatId = msg.key.remoteJid;
-
         const qCtx = msg.message?.extendedTextMessage?.contextInfo;
         let target;
-
         if (qCtx?.mentionedJid?.[0]) {
           target = qCtx.mentionedJid[0];
         } else if (qCtx?.participant) {
           target = qCtx.participant;
-        } else if (args[0]) {
-          const cleaned = args[0].replace(/[^0-9]/g, '');
-          if (cleaned.length >= 8) {
-            target = cleaned + '@s.whatsapp.net';
-          } else {
-            target = sender;
-          }
+        } else if (args[0]?.replace(/[^0-9]/g, '')) {
+          target = args[0].replace(/[^0-9]/g, '') + '@s.whatsapp.net';
         } else {
           target = sender;
-        }
-
-        // Validate target jid format
-        if (!target || (!target.endsWith('@s.whatsapp.net') && !target.endsWith('@lid'))) {
-          return reply('❌ Invalid number or mention. Try: .pfp @user or .pfp 947XXXXXXXX');
         }
 
         let dpUrl;
         try {
           dpUrl = await socket.profilePictureUrl(target, 'image');
         } catch (e) {
-          // fallback to low-res if high-res fails
-          try {
-            dpUrl = await socket.profilePictureUrl(target, 'preview');
-          } catch (e2) {
-            return reply('❌ No DP found or Privacy protected!');
-          }
+          return reply('No DP or Privacy protected');
         }
 
-        await socket.sendMessage(chatId, {
-          image: { url: dpUrl },
-          caption: `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗗𝗣 🎀] ¡! ❞*\n\n📷 Profile picture of @${target.split('@')[0]}`,
-          mentions: [target]
+        await socket.sendMessage(sender, { 
+          image: { url: dpUrl }, 
+          caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗗𝗣 🎀] ¡! ❞*\n\n📷 Profile picture of @${target.split('@')[0]}`, 
+          mentions: [target] 
         }, { quoted: msg });
 
       } catch (err) {
-        console.error('PFP Error:', err);
-        reply('❌ An error occurred while fetching the DP.');
+        console.error(err);
+        reply('Known Error');
       }
       break;
     }
@@ -2721,8 +2048,8 @@ case 'fancytext': {
 // ════════════ OWNER ════════════
 
                 case 'owner': {
-    const ownerNum = '+94763353368';
-    const ownerName = 'お 𝗜ꜱᴀɴᴋᴀ ࣪𖤐.ᐟ';
+    const ownerNum = '+94707447414';
+    const ownerName = 'お 𝐂𝐡𝐚𝐦𝐨𝐝 ࣪𖤐.ᐟ';
     
     await socket.sendMessage(sender, { react: { text: '🥷', key: msg.key } });
 
@@ -2731,13 +2058,13 @@ case 'fancytext': {
         contacts: {
             displayName: ownerName,
             contacts: [{
-                vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${ownerName}\nORG:𝐊𝐚𝐝𝐢𝐲𝐚 𝐗 𝐎𝐰𝐧𝐞𝐫;\nTEL;type=CELL;type=VOICE;waid=${ownerNum.slice(1)}:${ownerNum}\nEND:VCARD`
+                vcard: `BEGIN:VCARD\nVERSION:3.0\nFN:${ownerName}\nORG:𝐀𝐤𝐢𝐫𝐚 𝐗 𝐎𝐰𝐧𝐞𝐫;\nTEL;type=CELL;type=VOICE;waid=${ownerNum.slice(1)}:${ownerNum}\nEND:VCARD`
             }]
         }
     });
 
     await socket.sendMessage(sender, {
-        text: `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗚𝗶𝗿𝗹 𝗢𝘄𝗻𝗲𝗿 🎀] ¡! ❞*\n\n₊❏❜ ⋮👤 Name: ${ownerName}\n₊❏❜ ⋮ 📞 Number: ${ownerNum}\n\n> *𝗔esthatic 𝗤ueen 𝗕y 𝗜ꜱᴀɴᴋᴀ 𝜗𝜚⋆*`,
+        text: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗚𝗶𝗿𝗹 𝗢𝘄𝗻𝗲𝗿 🎀] ¡! ❞*\n\n₊❏❜ ⋮👤 Name: ${ownerName}\n₊❏❜ ⋮ 📞 Number: ${ownerNum}\n\n> *𝗔esthatic 𝗤ueen 𝗕y 𝗖hamod 𝜗𝜚⋆*`,
         contextInfo: {
             mentionedJid: [`${ownerNum.slice(1)}@s.whatsapp.net`]
         }
@@ -2804,352 +2131,42 @@ case 'lvcal': {
     break;
 }
 
-// ════════════ CURRENCY RATE ════════════
-// .rate USD LKR        -> 1 USD in LKR
-// .rate USD LKR 100     -> 100 USD in LKR
-// .rate                 -> defaults to USD -> LKR
+// ════════════ HACK ════════════
 
-case 'rate':
-case 'exchange':
-case 'currency': {
+case 'hack': {
     try {
-        const parts = body.split(' ').slice(1);
-        let from = (parts[0] || 'USD').toUpperCase();
-        let to = (parts[1] || 'LKR').toUpperCase();
-        let amount = parseFloat(parts[2]) || 1;
+        const from = msg.key.remoteJid; 
+        const steps = [
+            '🎀 *𝐀𝐤𝐢𝐫𝐚 𝐇𝐚𝐜𝐤 𝐒𝐭𝐚𝐫𝐢𝐧𝐠...* 🎀',
+            '`ɪɴɪᴛɪᴀʟɪᴢɪɴɢ ʜᴀᴄᴋɪɴɢ ᴛᴏᴏʟꜱ...` 🛠️',
+            '`ᴄᴏɴɴᴇᴄᴛɪɴɢ ᴛᴏ ʀᴇᴍᴏᴛᴇ ꜱᴇʀᴠᴇʀ...` 🌐',
+            '```[##] 20%``` ⏳',
+            '```[####] 40%``` ⏳',
+            '```[######] 60%``` ⏳',
+            '```[########] 80%``` ⏳',
+            '```[##########] 100%``` ✅',
+            '🔒 *𝐒ystem 𝐁reach: 𝐒uccessful!* 🔓',
+            '*🎀 𝐀kira 𝐇acking 𝐒uccessful 🎭*',
+        ];
 
-        await socket.sendMessage(sender, { react: { text: '💱', key: msg.key } }).catch(() => {});
+        await socket.sendMessage(from, { react: { text: '💀', key: msg.key } });
 
-        // exchangerate.host - free API, key nathiwa weda
-        const url = `https://api.exchangerate.host/convert?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&amount=${amount}`;
-        const { data } = await axios.get(url, { timeout: 15000 });
+        let initialMsg = await socket.sendMessage(from, { text: steps[0] }, { quoted: msg });
 
-        if (!data || data.success === false || typeof data.result !== 'number') {
-            throw new Error('Invalid currency code or rate unavailable');
+        for (let i = 1; i < steps.length; i++) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // තත්පර 1ක ප්‍රමදයක්
+
+            await socket.sendMessage(from, {
+                text: steps[i],
+                edit: initialMsg.key,
+				contextInfo: arabianCtx() 
+            });
         }
-
-        const unitRate = data.info?.rate ?? (data.result / amount);
-
-        let replyText = `💱 *Currency Exchange*\n\n`;
-        replyText += `🔁 *${amount} ${from} = ${data.result.toFixed(2)} ${to}*\n`;
-        replyText += `📊 *Rate*: 1 ${from} = ${unitRate.toFixed(4)} ${to}\n`;
-        replyText += `📅 *Date*: ${data.date || moment().format('YYYY-MM-DD')}`;
-
-        await socket.sendMessage(sender, { text: replyText }, { quoted: msg });
-        await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } });
 
     } catch (e) {
-        console.log("RATE ERROR:", e.message);
-        reply("❌ *Currency code එක හරි නෑ, නැත්නම් rate ගන්න බැරි උනා*\nEx: `.rate USD LKR` `.rate EUR USD 50`");
+        console.log(e);
+        reply(`❌ *Error!* ${e.message}`);
     }
-    break;
-}
-
-// ════════════ TEMP MAIL ════════════
-// .tempmail            -> creates a new temp email for you
-// .checkmail           -> checks your temp email inbox (auto extracts OTP/code)
-// .checkmail <id>      -> checks any specific temp mail id's inbox
-
-case 'tempmail':
-case 'tmail':
-case 'newmail': {
-    try { await socket.sendMessage(sender, { react: { text: '📧', key: msg.key } }); } catch (_) {}
-
-    try {
-        await socket.sendMessage(sender, { text: '⏳ Temp email එකක් හදනවා...' }, { quoted: msg });
-
-        const apiRes = await axios.get(TEMPMAIL_API_BASE, {
-            params: { action: 'create', apitoken: TEMPMAIL_API_TOKEN },
-            timeout: 15000
-        });
-
-        const result = apiRes.data?.result;
-        if (!apiRes.data?.success || !result?.email) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-            return await socket.sendMessage(sender, { text: '❌ Temp mail එකක් හදන්න බැරි උනා. ටිකකින් try කරන්න.' }, { quoted: msg });
-        }
-
-        const tempMails = loadTempMails();
-        tempMails[sender] = {
-            id: result.email_id,
-            email: result.email,
-            createdAt: Date.now()
-        };
-        saveTempMails(tempMails);
-
-        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
-
-        await socket.sendMessage(sender, {
-            text: `*🎀 𝗔𝗸𝗶𝗿𝗮 𝗧𝗲𝗺𝗽 𝗠𝗮𝗶𝗹 🎀*\n\n📧 *Email:* ${result.email}\n🆔 *ID:* ${result.email_id}\n\n> Mail එකට code එකක් ආවම *${sessionConfig.PREFIX || '.'}checkmail* type කරලා බලන්න.`
-        }, { quoted: msg });
-
-    } catch (error) {
-        console.error('TempMail Create Error:', error.response?.data || error.message);
-        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, { text: `⚠️ Error: ${error.message}` }, { quoted: msg });
-    }
-    break;
-}
-
-// ════════════ FREE FIRE UID INFO ════════════
-// .ffinfo <uid>   -> fetch Free Fire player info by UID
-case 'ffinfo':
-case 'ffid':
-case 'ff': {
-    try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
-
-    const uid = (args[0] || '').toString().trim();
-    if (!uid || !/^\d{6,12}$/.test(uid)) {
-        try { await socket.sendMessage(sender, { react: { text: '❓', key: msg.key } }); } catch (_) {}
-        return await socket.sendMessage(sender, {
-            text: `*❓ Usage:*\n${sessionConfig.PREFIX || '.'}ffinfo <UID>\n\n*Example:* ${sessionConfig.PREFIX || '.'}ffinfo 123456789`
-        }, { quoted: msg });
-    }
-
-    try {
-        const apiRes = await axios.get('https://ff-id-info-4-akira-girl-8bru.vercel.app/player-info', {
-            params: { uid },
-            timeout: 15000
-        });
-
-        const data = apiRes.data;
-        // API may wrap the payload differently, so check a few common shapes
-        const result = data?.data || data?.result || data?.player || data;
-
-        if (!result || data?.success === false || data?.error) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-            return await socket.sendMessage(sender, {
-                text: `❌ UID *${uid}* සදහා තොරතුරු හොයාගන්න බැරි උනා.\n${data?.error || data?.message || ''}`
-            }, { quoted: msg });
-        }
-
-        // Flatten possible nested sections so we can pull fields regardless of exact naming
-        const basic = result.basicInfo || result.basic_info || result.AccountInfo || result.account || result;
-        const clan = result.clanBasicInfo || result.guild || result.Guild || result.clan;
-        const brRank = result.brRank || result.BR_Rank || result.rank?.br;
-        const csRank = result.csRank || result.CS_Rank || result.rank?.cs;
-
-        const nickname = basic?.nickname || basic?.name || result.nickname || 'Unknown';
-        const level = basic?.level || basic?.Level || result.level || 'N/A';
-        const likes = basic?.liked || basic?.likes || result.likes || 'N/A';
-        const region = basic?.region || result.region || 'N/A';
-        const exp = basic?.exp || basic?.experience || 'N/A';
-        const signature = basic?.signature || basic?.bio || '';
-        const createAt = basic?.createAt || basic?.accountCreateTime || basic?.created || 'N/A';
-        const lastLogin = basic?.lastLoginAt || basic?.lastLogin || 'N/A';
-
-        const guildName = clan?.guildName || clan?.name || 'No Guild';
-        const guildLevel = clan?.guildLevel || clan?.level || 'N/A';
-        const guildMembers = clan?.guildMemberCount || clan?.members || 'N/A';
-
-        const brRankShow = brRank?.rank || brRank || 'N/A';
-        const brPoints = brRank?.rankingPoints || brRank?.points || 'N/A';
-        const csRankShow = csRank?.rank || csRank || 'N/A';
-        const csPoints = csRank?.rankingPoints || csRank?.points || 'N/A';
-
-        let out = `*🎀 𝗙𝗿𝗲𝗲 𝗙𝗶𝗿𝗲 𝗣𝗹𝗮𝘆𝗲𝗿 𝗜𝗻𝗳𝗼 🎀*\n\n`;
-        out += `👤 *Nickname:* ${nickname}\n`;
-        out += `🆔 *UID:* ${uid}\n`;
-        out += `📶 *Level:* ${level}${exp !== 'N/A' ? ` (EXP: ${exp})` : ''}\n`;
-        out += `❤️ *Likes:* ${likes}\n`;
-        out += `🌍 *Region:* ${region}\n`;
-        if (signature) out += `📝 *Bio:* ${signature}\n`;
-        out += `\n🏆 *BR Rank:* ${brRankShow}${brPoints !== 'N/A' ? ` (${brPoints} pts)` : ''}\n`;
-        out += `🎯 *CS Rank:* ${csRankShow}${csPoints !== 'N/A' ? ` (${csPoints} pts)` : ''}\n`;
-        out += `\n🛡️ *Guild:* ${guildName}\n`;
-        if (guildName !== 'No Guild') {
-            out += `📊 *Guild Level:* ${guildLevel}\n`;
-            out += `👥 *Members:* ${guildMembers}\n`;
-        }
-        if (createAt !== 'N/A') out += `\n📅 *Account Created:* ${createAt}\n`;
-        if (lastLogin !== 'N/A') out += `⏱️ *Last Login:* ${lastLogin}\n`;
-
-        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, {
-            text: out.trim(),
-            contextInfo: {
-                externalAdReply: {
-                    title: `Free Fire Player - ${nickname}`,
-                    body: `UID: ${uid}`,
-                    thumbnailUrl: akira,
-                    sourceUrl: '',
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
-        }, { quoted: msg });
-
-    } catch (error) {
-        console.error('FF Info Error:', error.response?.data || error.message);
-        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, {
-            text: `⚠️ Error fetching player info: ${error.response?.data?.error || error.message}`
-        }, { quoted: msg });
-    }
-    break;
-}
-
-case 'checkmail':
-case 'inbox':
-case 'mailcheck': {
-    try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
-
-    try {
-        const tempMails = loadTempMails();
-        const myMail = tempMails[sender];
-        const id = (args[0] || myMail?.id || '').toString().trim();
-
-        if (!id) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-            return await socket.sendMessage(sender, {
-                text: `❌ ඔයාට temp mail එකක් නෑ.\nපලමුව *${sessionConfig.PREFIX || '.'}tempmail* type කරලා email එකක් හදාගන්න.`
-            }, { quoted: msg });
-        }
-
-        const apiRes = await axios.get(TEMPMAIL_API_BASE, {
-            params: { action: 'check', id, apitoken: TEMPMAIL_API_TOKEN },
-            timeout: 15000
-        });
-
-        const result = apiRes.data?.result;
-        if (!apiRes.data?.success) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-            return await socket.sendMessage(sender, { text: '❌ Inbox එක check කරන්න බැරි උනා.' }, { quoted: msg });
-        }
-
-        const messages = result?.messages || result?.inbox || result?.emails || result?.mails
-            || result?.data || result?.list || [];
-
-        if (!Array.isArray(messages) || messages.length === 0) {
-            try { await socket.sendMessage(sender, { react: { text: '📭', key: msg.key } }); } catch (_) {}
-            return await socket.sendMessage(sender, {
-                text: `📭 *${myMail?.email || id}* mail එකට තාම මොකුත් ආවේ නෑ.\n\nපොඩ්ඩක් ඉඳලා ආයෙත් *${sessionConfig.PREFIX || '.'}checkmail* try කරන්න.`
-            }, { quoted: msg });
-        }
-
-        let out = `*🎀 𝗔𝗸𝗶𝗿𝗮 𝗜𝗻𝗯𝗼𝘅 🎀*\n📧 ${myMail?.email || id}\n\n`;
-
-        messages.slice(0, 5).forEach((m, i) => {
-            const from = m.from || m.sender || m.mail_from || 'Unknown';
-            const subject = m.subject || m.title || 'No Subject';
-            const rawBody = m.body || m.text || m.html || m.message || m.content || '';
-            const plainBody = String(rawBody).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-            const code = extractVerificationCode(plainBody) || extractVerificationCode(subject);
-
-            out += `*${i + 1}. From:* ${from}\n*Subject:* ${subject}\n`;
-            if (code) out += `🔑 *Code:* \`${code}\`\n`;
-            if (plainBody) out += `📝 ${plainBody.slice(0, 250)}${plainBody.length > 250 ? '...' : ''}\n`;
-            out += `\n`;
-        });
-
-        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, { text: out.trim() }, { quoted: msg });
-
-    } catch (error) {
-        console.error('TempMail Check Error:', error.response?.data || error.message);
-        try { await socket.sendMessage(sender, { react: { text: '⚠️', key: msg.key } }); } catch (_) {}
-        await socket.sendMessage(sender, { text: `⚠️ Error: ${error.message}` }, { quoted: msg });
-    }
-    break;
-}
-
-// ════════════ AUTO REPLY ════════════
-// .setreply hi | Hello there!                -> text auto reply
-// .setreply hi | voice:https://link.to/audio.mp3   -> voice-clip auto reply
-// .setreply hi | Hello there! | voice:https://link.to/audio.mp3  -> both
-// .setreply contains:hello | Hi there!        -> "contains" match instead of exact
-// .delreply hi
-// .listreply
-
-case 'setreply':
-case 'addreply': {
-    if (!isOwner) return reply('❌ Only the bot owner/admin can set auto replies.');
-
-    const raw = args.join(' ');
-    if (!raw || !raw.includes('|')) {
-        return reply(
-            `*❓ Usage:*\n${sessionConfig.PREFIX || '!'}setreply <keyword> | <reply text>\n${sessionConfig.PREFIX || '!'}setreply <keyword> | voice:<audio link>\n${sessionConfig.PREFIX || '!'}setreply <keyword> | <reply text> | voice:<audio link>\n\n_Prefix keyword with "contains:" to match anywhere in the message instead of exact match._`
-        );
-    }
-
-    const segments = raw.split('|').map(s => s.trim()).filter(Boolean);
-    let keywordRaw = segments[0];
-    let matchType = 'exact';
-    if (keywordRaw.toLowerCase().startsWith('contains:')) {
-        matchType = 'contains';
-        keywordRaw = keywordRaw.slice('contains:'.length).trim();
-    }
-
-    if (!keywordRaw) return reply('❌ Please provide a valid keyword.');
-
-    let replyText = null;
-    let voiceUrl = null;
-
-    for (const seg of segments.slice(1)) {
-        if (seg.toLowerCase().startsWith('voice:')) {
-            voiceUrl = seg.slice('voice:'.length).trim();
-        } else if (!replyText) {
-            replyText = seg;
-        }
-    }
-
-    if (!replyText && !voiceUrl) {
-        return reply('❌ Please provide reply text and/or a voice: link.');
-    }
-
-    const autoReplies = loadAutoReplies();
-    autoReplies[keywordRaw] = {
-        matchType,
-        text: replyText || undefined,
-        voiceUrl: voiceUrl || undefined
-    };
-
-    const saved = saveAutoReplies(autoReplies);
-    if (!saved) return reply('❌ Failed to save auto reply.');
-
-    await reply(
-        `✅ *Auto reply saved!*\n\n*Keyword:* ${keywordRaw}\n*Match:* ${matchType}\n${replyText ? `*Text:* ${replyText}\n` : ''}${voiceUrl ? `*Voice:* ${voiceUrl}\n` : ''}`
-    );
-    break;
-}
-
-case 'delreply':
-case 'removereply': {
-    if (!isOwner) return reply('❌ Only the bot owner/admin can delete auto replies.');
-
-    const keywordRaw = args.join(' ').trim();
-    if (!keywordRaw) return reply(`*❓ Usage:* ${sessionConfig.PREFIX || '!'}delreply <keyword>`);
-
-    const autoReplies = loadAutoReplies();
-    if (!autoReplies[keywordRaw]) {
-        return reply(`❌ No auto reply found for keyword: *${keywordRaw}*`);
-    }
-
-    delete autoReplies[keywordRaw];
-    saveAutoReplies(autoReplies);
-    await reply(`✅ Deleted auto reply for keyword: *${keywordRaw}*`);
-    break;
-}
-
-case 'listreply':
-case 'replylist': {
-    const autoReplies = loadAutoReplies();
-    const keys = Object.keys(autoReplies);
-
-    if (keys.length === 0) {
-        return reply('📭 No auto replies set yet.\nUse *setreply* to add one.');
-    }
-
-    let listMsg = `*🎀 AUTO REPLY LIST 🎀*\n\n`;
-    keys.forEach((k, i) => {
-        const entry = autoReplies[k];
-        listMsg += `*${i + 1}. ${k}* _(${entry.matchType || 'exact'})_\n`;
-        if (entry.text) listMsg += `   💬 ${entry.text}\n`;
-        if (entry.voiceUrl) listMsg += `   🎙️ ${entry.voiceUrl}\n`;
-        listMsg += `\n`;
-    });
-
-    await reply(listMsg);
     break;
 }
 
