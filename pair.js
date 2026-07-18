@@ -1133,47 +1133,50 @@ case 'emojidb': {
             responseText += `*And ${filteredEmojis.length - 15} more emojis found...*\n`;
         }
 
-        const destinationJid = msg.key.remoteJid;
+        // ආරක්ෂිතව JID එක ලබා ගැනීම
+        const destinationJid = msg.key.remoteJid || from;
 
-        // 4. වර්තමාන WhatsApp සඳහා 100%ක් වැඩ කරන Interactive Buttons සැකසීම
+        // 4. වර්තමාන WhatsApp සඳහා 100%ක් වැඩ කරන නිවැරදි Interactive Buttons ව්‍යුහය
         const buttonMessage = {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage: {
-                        header: { title: "", hasMediaAttachment: false },
-                        body: { text: responseText },
-                        footer: { text: "𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀" },
-                        nativeFlowMessage: {
-                            buttons: [
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📜 Main Menu",
-                                        id: ".menu"
-                                    })
-                                },
-                                {
-                                    name: "quick_reply",
-                                    buttonParamsJson: JSON.stringify({
-                                        display_text: "📶 Bot Status",
-                                        id: ".ping"
-                                    })
-                                }
-                            ],
-                            messageVersion: 1
+            interactiveMessage: {
+                body: { text: responseText },
+                footer: { text: "𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀" },
+                header: { hasMediaAttachment: false },
+                nativeFlowMessage: {
+                    buttons: [
+                        {
+                            name: "quick_reply",
+                            buttonParamsJson: JSON.stringify({
+                                display_text: "📜 Main Menu",
+                                id: ".menu"
+                            })
                         },
-                        contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
-                    }
+                        {
+                            name: "quick_reply",
+                            buttonParamsJson: JSON.stringify({
+                                display_text: "📶 Bot Status",
+                                id: ".ping"
+                            })
+                        }
+                    ],
+                    messageVersion: 1
                 }
             }
         };
 
-        // 5. පණිවිඩය යැවීම
-        await socket.sendMessage(destinationJid, buttonMessage, { quoted: msg });
+        // 5. පණිවිඩය ආරක්ෂිතව යැවීම (Fail-Safe ක්‍රමවේදය සහිතව)
+        try {
+            await socket.sendMessage(destinationJid, { viewOnceMessage: { message: buttonMessage } }, { quoted: msg });
+        } catch (btnErr) {
+            // යම් හෙයකින් Button Message එක Fail වුවහොත් සාමාන්‍ය Text එකක් ලෙස යවයි (200% Safe)
+            console.error("Button error, sending plain text:", btnErr);
+            await socket.sendMessage(destinationJid, { text: responseText + "\n\n*𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀*" }, { quoted: msg });
+        }
 
     } catch (err) {
-        console.error("EMOJI CMD ERROR:", err);
-        reply('❌ *Emoji සෙවීමේදී දෝෂයක් සිදු විය! කරුණාකර නැවත උත්සාහ කරන්න.*');
+        console.error("EMOJI CMD CRITICAL ERROR:", err);
+        // සැබෑ දෝෂය කුමක්දැයි හඳුනා ගැනීමට err.message එක් කර ඇත
+        reply(`❌ *Emoji සෙවීමේදී දෝෂයක් සිදු විය!*\n\n*Error:* \`${err.message}\``);
     }
     break;
 }
