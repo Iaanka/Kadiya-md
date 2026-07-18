@@ -1058,17 +1058,14 @@ const downloadQuotedMedia = async (quoted) => {
 
       break;
     }
-// ════════════ CARD ════════════
-// === Emoji Search / Finder Command ===
-
+// ════════════ EMOJI ════════════
 case 'emoji':
 case 'emojisearch':
 case 'emojidb': {
     try {
         const axios = require('axios');
 
-        // 1. පරිශීලකයා ඇතුළත් කළ සෙවුම් පදය (Query) ලබා ගැනීම
-        const searchQuery = q ? q.trim() : '';
+        const searchQuery = q ? q.trim().toLowerCase() : '';
 
         if (!searchQuery) {
             return reply('❌ *කරුණාකර සෙවිය යුතු Emoji වචනය ඇතුළත් කරන්න!*\n\n*භාවිතය:* _.emoji [වචනය]_\n*උදාහරණ:* _.emoji heart_ හෝ _.emoji smile_');
@@ -1076,19 +1073,31 @@ case 'emojidb': {
 
         reply(`🔍 *"${searchQuery}" සඳහා ගැළපෙන Emojis සොයමින් පවතී...*`);
 
-        // 2. EmojiDB API එකට Request එකක් යැවීම
-        const apiUrl = `https://emojidbapi.netlify.app/api/emojis?query=${encodeURIComponent(searchQuery)}`;
+        // 1. 100% Uptime සහිත නිල Enterprise Emoji CDN එක භාවිතා කිරීම
+        const cdnUrl = `https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.0.0/emoji.json`;
         
-        const response = await axios.get(apiUrl, { timeout: 10000 });
-        const data = response.data;
+        const response = await axios.get(cdnUrl, { timeout: 10000 });
+        const allEmojis = response.data;
 
-        // API එකෙන් දත්ත ලැබී තිබේදැයි සහ ඒවා Array එකක්දැයි පරීක්ෂා කිරීම
-        if (!data || !data.emojis || !Array.isArray(data.emojis) || data.emojis.length === 0) {
+        if (!allEmojis || !Array.isArray(allEmojis)) {
+            return reply('❌ *Emoji දත්ත පද්ධතිය ලබා ගැනීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න!*');
+        }
+
+        // 2. පරිශීලකයා සෙවූ වචනයට අනුව දත්ත Filter කර ගැනීම
+        const filteredEmojis = allEmojis.filter(item => {
+            const nameMatch = item.name ? item.name.toLowerCase().includes(searchQuery) : false;
+            const shortNameMatch = item.short_name ? item.short_name.toLowerCase().includes(searchQuery) : false;
+            const categoryMatch = item.category ? item.category.toLowerCase().includes(searchQuery) : false;
+            const shortNamesMatch = item.short_names ? item.short_names.some(sn => sn.toLowerCase().includes(searchQuery)) : false;
+            
+            return nameMatch || shortNameMatch || categoryMatch || shortNamesMatch;
+        });
+
+        if (filteredEmojis.length === 0) {
             return reply(`❌ *"${searchQuery}" සඳහා කිසිදු Emoji එකක් සොයා ගැනීමට නොහැකි විය!*`);
         }
 
-        const totalEmojis = data.total || data.emojis.length;
-        const emojiList = data.emojis;
+        const totalEmojis = filteredEmojis.length;
 
         // 3. නිමැවුම (Caption/Text) අලංකාරව සැකසීම
         let responseText = `*🦋 ─── 𝐄𝐌𝐎𝐉𝐈 𝐅𝐈𝐍𝐃𝐄𝐑 ─── 🦋*\n\n`;
@@ -1096,39 +1105,70 @@ case 'emojidb': {
         responseText += `🔢 *Total Found:* \`${totalEmojis}\` Emojis\n\n`;
         responseText += `─── *𝐒𝐞𝐚𝐫𝐜𝐡 𝐑𝐞𝐬𝐮𝐥𝐭𝐬* ───\n\n`;
 
-        // උපරිම ප්‍රතිඵල 15ක් පමණක් පෙන්වීමට සීමා කිරීම (Message එක දිග වැඩිවීම වැළැක්වීමට)
-        const maxResults = Math.min(emojiList.length, 15);
+        // උපරිම ප්‍රතිඵල 15ක් පමණක් පෙන්වීමට සීමා කිරීම
+        const maxResults = Math.min(filteredEmojis.length, 15);
 
-        for (let i = 0; i < maxResults; i++) {
-            const item = emojiList[i];
-            responseText += `${i + 1}. ${item.emoji || '😀'} *${item.name || 'Unnamed'}*\n`;
-            responseText += `   🏷️ *Keywords:* _${item.keywords ? item.keywords.join(', ') : 'N/A'}_\n`;
-            responseText += `   🔣 *Unicode:* \`${item.unicode || 'N/A'}\`\n\n`;
-        }
-
-        // ප්‍රතිඵල 15කට වඩා තිබේනම් ඉතිරි ප්‍රමාණය මෙලෙස පෙන්වයි
-        if (emojiList.length > 15) {
-            responseText += `*And ${emojiList.length - 15} more emojis found...*\n`;
-        }
-
-        // 4. Buttons සැකසීම (මෙම Array එකට අවශ්‍ය buttons එකතු කරන්න)
-        const buttons = [
-            { buttonId: '.menu', buttonText: { displayText: '📜 Main Menu' }, type: 1 },
-            { buttonId: '.ping', buttonText: { displayText: '📶 Ping' }, type: 1 }
-        ];
-
-        // 5. සකස් කරගත් ප්‍රතිඵලය සහ buttons පරිශීලකයා වෙත යැවීම
-        const destinationJid = msg.key.remoteJid;
-        
-        // Button Message Structure එක
-        const buttonMessage = {
-            text: responseText,
-            footer: '𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀',
-            buttons: buttons,
-            headerType: 1, // Text header type
-            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+        // Unicode Hex එක සැබෑ Emoji එකක් බවට පත් කරන Function එක
+        const convertToEmoji = (unifiedStr) => {
+            try {
+                return unifiedStr.split('-')
+                    .map(hex => String.fromCodePoint(parseInt(hex, 16)))
+                    .join('');
+            } catch (e) {
+                return '😀';
+            }
         };
 
+        for (let i = 0; i < maxResults; i++) {
+            const item = filteredEmojis[i];
+            const actualEmoji = convertToEmoji(item.unified);
+            const emojiName = item.name ? item.name.charAt(0) + item.name.slice(1).toLowerCase() : item.short_name;
+
+            responseText += `${i + 1}. ${actualEmoji} *${emojiName || 'Unnamed'}*\n`;
+            responseText += `   🏷️ *Keywords:* _${item.short_names ? item.short_names.join(', ') : 'N/A'}_\n`;
+            responseText += `   🔣 *Unicode:* \`U+${item.unified}\`\n\n`;
+        }
+
+        if (filteredEmojis.length > 15) {
+            responseText += `*And ${filteredEmojis.length - 15} more emojis found...*\n`;
+        }
+
+        const destinationJid = msg.key.remoteJid;
+
+        // 4. වර්තමාන WhatsApp සඳහා 100%ක් වැඩ කරන Interactive Buttons සැකසීම
+        const buttonMessage = {
+            viewOnceMessage: {
+                message: {
+                    interactiveMessage: {
+                        header: { title: "", hasMediaAttachment: false },
+                        body: { text: responseText },
+                        footer: { text: "𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀" },
+                        nativeFlowMessage: {
+                            buttons: [
+                                {
+                                    name: "quick_reply",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "📜 Main Menu",
+                                        id: ".menu"
+                                    })
+                                },
+                                {
+                                    name: "quick_reply",
+                                    buttonParamsJson: JSON.stringify({
+                                        display_text: "📶 Bot Status",
+                                        id: ".ping"
+                                    })
+                                }
+                            ],
+                            messageVersion: 1
+                        },
+                        contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+                    }
+                }
+            }
+        };
+
+        // 5. පණිවිඩය යැවීම
         await socket.sendMessage(destinationJid, buttonMessage, { quoted: msg });
 
     } catch (err) {
@@ -1137,6 +1177,7 @@ case 'emojidb': {
     }
     break;
 }
+
 
 
 // ════════════ ALIVE ════════════
