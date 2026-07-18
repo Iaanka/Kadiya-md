@@ -1137,81 +1137,58 @@ case 'alive': {
 	}
 
 // ════════════ SONG ════════════
-case 'lyrics':
-case 'song': {
-    try {
-        const query = args.join(' ');
-        if (!query) return reply("🎵 *Plz Send Me A Song Name !*");
+case 'song':
+case 'play': {
+  const query = args.join(' ') || (msg.message?.extendedTextMessage?.contextInfo?.quotedMessage?.conversation);
+  if (!query) return reply(`*.song <song name>*\n\nඋදා: .song Manike Mage Hithe`);
 
-        try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
+  try {
+    await reply('🔍 සින්දුව හොයනවා...');
 
-        const apiUrl = `https://api.zanta-mini.store/api/song?apiKey=zan_w8lSd1pK_t79f2pa52p&url=${encodeURIComponent(query)}`;
+    const yts = require('yt-search');
+    const search = await yts(query);
+    const video = search.videos[0];
 
-        let data;
-        try {
-            const res = await axios.get(apiUrl, {
-                timeout: 15000,
-                headers: { 'User-Agent': 'Mozilla/5.0' }
-            });
-            data = res.data;
-        } catch (e) {
-            console.log("LYRICS API ERROR:", e.message);
-            return reply("❌ *Lyrics Server Error, Try Again Later !*");
-        }
+    if (!video) return reply('සින්දුව හම්බුනේ නෑ 😔');
 
-        if (!data || !data.success || !data.result) {
-            return reply("❌ *I Cant Find Lyrics For That !*");
-        }
+    const details = 
+`🎵 *${video.title}*
 
-        const { title, url, thumbnail, lyrics } = data.result;
+👤 Channel: ${video.author.name}
+⏱️ Duration: ${video.timestamp}
+👁️ Views: ${video.views.toLocaleString()}
+📅 Uploaded: ${video.ago}
+🔗 ${video.url}`;
 
-        if (!lyrics) return reply("❌ *No Lyrics Found For That Song !*");
+    // thumbnail සමඟ details යවනවා
+    await socket.sendMessage(sender, {
+      image: { url: video.thumbnail },
+      caption: details,
+      contextInfo: arabianCtx()
+    }, { quoted: msg });
 
-        const slDate = moment().tz('Asia/Colombo').format('YYYY-MM-DD');
-        const slTimeNow = moment().tz('Asia/Colombo').format('HH:mm:ss');
+    // ---- audio download කොටස ----
+    // මෙතන ඔයාට audio buffer එකක් ලබාගන්න ඕන.
+    // ffmpeg + play-dl/ytdl-core හෝ ඔයා use කරන 3rd-party API එකෙන් 
+    // audio stream/buffer එක ලබාගෙන මෙතනට දාන්න.
 
-        // WhatsApp caption limit is ~1024 chars — keep header short, send lyrics separately if long
-        const header = `*↳ ❝ [🎀 𝗞ᴀᴅɪʏᴀ 𝗟ʏʀɪᴄs 🎀] ¡! ❞*\n\n` +
-                       `> *\`🎵 𝚃𝙸𝚃𝙻𝙴 :\`* ${title}\n` +
-                       `> *\`📅 𝙳𝙰𝚃𝙴 :\`* ${slDate}\n` +
-                       `> *\`⌚ 𝚃𝙸𝙼𝙴 :\`* ${slTimeNow}\n\n` +
-                       `> *𝗞ᴀᴅɪʏᴀ 𝗕ʏ 𝗜sanka 𝜗𝜚⋆*`;
+    const audioBuffer = await downloadAudio(video.url); // <-- ඔයාගේ existing function එක
 
-        try {
-            if (thumbnail) {
-                await socket.sendMessage(sender, {
-                    image: { url: thumbnail },
-                    caption: header,
-                    contextInfo: arabianCtx()
-                }, { quoted: msg });
-            } else {
-                await socket.sendMessage(sender, { text: header, contextInfo: arabianCtx() }, { quoted: msg });
-            }
-        } catch (e) {
-            console.log("LYRICS HEADER SEND ERROR:", e);
-            // not fatal, continue to send lyrics text
-        }
+    if (!audioBuffer) return reply('Audio download වුනේ නෑ, try again.');
 
-        // Send lyrics as a separate message, chunked if too long (WhatsApp text limit ~65536, but keep readable chunks)
-        const CHUNK_SIZE = 4000;
-        const lyricsText = `📜 *𝗟𝗬𝗥𝗜𝗖𝗦*\n\n${lyrics}` + (url ? `\n\n🔗 *𝚂𝙾𝚄𝚁𝙲𝙴:* ${url}` : '');
+    await socket.sendMessage(sender, {
+      audio: audioBuffer,
+      mimetype: 'audio/mpeg',
+      fileName: `${video.title}.mp3`,
+      contextInfo: arabianCtx()
+    }, { quoted: msg });
 
-        if (lyricsText.length <= CHUNK_SIZE) {
-            await socket.sendMessage(sender, { text: lyricsText, contextInfo: arabianCtx() }, { quoted: msg });
-        } else {
-            for (let i = 0; i < lyricsText.length; i += CHUNK_SIZE) {
-                const chunk = lyricsText.slice(i, i + CHUNK_SIZE);
-                await socket.sendMessage(sender, { text: chunk, contextInfo: arabianCtx() });
-            }
-        }
+    try { await socket.sendMessage(sender, { react: { text: '🎧', key: msg.key } }); } catch (_) {}
 
-        try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
-
-    } catch (e) {
-        console.log("LYRICS CMD ERROR:", e);
-        reply("❌ *Error: " + e.message + "*");
-    }
-    break;
+  } catch (e) {
+    await reply(`Failed: ${e.message}`);
+  }
+  break;
 }
 
 					
