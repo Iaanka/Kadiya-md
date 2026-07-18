@@ -1059,7 +1059,84 @@ const downloadQuotedMedia = async (quoted) => {
       break;
     }
 // ════════════ CARD ════════════
-// === Professional Card Generator Command ===
+// === Emoji Search / Finder Command ===
+
+case 'emoji':
+case 'emojisearch':
+case 'emojidb': {
+    try {
+        const axios = require('axios');
+
+        // 1. පරිශීලකයා ඇතුළත් කළ සෙවුම් පදය (Query) ලබා ගැනීම
+        const searchQuery = q ? q.trim() : '';
+
+        if (!searchQuery) {
+            return reply('❌ *කරුණාකර සෙවිය යුතු Emoji වචනය ඇතුළත් කරන්න!*\n\n*භාවිතය:* _.emoji [වචනය]_\n*උදාහරණ:* _.emoji heart_ හෝ _.emoji smile_');
+        }
+
+        reply(`🔍 *"${searchQuery}" සඳහා ගැළපෙන Emojis සොයමින් පවතී...*`);
+
+        // 2. EmojiDB API එකට Request එකක් යැවීම
+        const apiUrl = `https://emojidbapi.netlify.app/api/emojis?query=${encodeURIComponent(searchQuery)}`;
+        
+        const response = await axios.get(apiUrl, { timeout: 10000 });
+        const data = response.data;
+
+        // API එකෙන් දත්ත ලැබී තිබේදැයි සහ ඒවා Array එකක්දැයි පරීක්ෂා කිරීම
+        if (!data || !data.emojis || !Array.isArray(data.emojis) || data.emojis.length === 0) {
+            return reply(`❌ *"${searchQuery}" සඳහා කිසිදු Emoji එකක් සොයා ගැනීමට නොහැකි විය!*`);
+        }
+
+        const totalEmojis = data.total || data.emojis.length;
+        const emojiList = data.emojis;
+
+        // 3. නිමැවුම (Caption/Text) අලංකාරව සැකසීම
+        let responseText = `*🦋 ─── 𝐄𝐌𝐎𝐉𝐈 𝐅𝐈𝐍𝐃𝐄𝐑 ─── 🦋*\n\n`;
+        responseText += `🔍 *Search:* \`${searchQuery}\`\n`;
+        responseText += `🔢 *Total Found:* \`${totalEmojis}\` Emojis\n\n`;
+        responseText += `─── *𝐒𝐞𝐚𝐫𝐜𝐡 𝐑𝐞𝐬𝐮𝐥𝐭𝐬* ───\n\n`;
+
+        // උපරිම ප්‍රතිඵල 15ක් පමණක් පෙන්වීමට සීමා කිරීම (Message එක දිග වැඩිවීම වැළැක්වීමට)
+        const maxResults = Math.min(emojiList.length, 15);
+
+        for (let i = 0; i < maxResults; i++) {
+            const item = emojiList[i];
+            responseText += `${i + 1}. ${item.emoji || '😀'} *${item.name || 'Unnamed'}*\n`;
+            responseText += `   🏷️ *Keywords:* _${item.keywords ? item.keywords.join(', ') : 'N/A'}_\n`;
+            responseText += `   🔣 *Unicode:* \`${item.unicode || 'N/A'}\`\n\n`;
+        }
+
+        // ප්‍රතිඵල 15කට වඩා තිබේනම් ඉතිරි ප්‍රමාණය මෙලෙස පෙන්වයි
+        if (emojiList.length > 15) {
+            responseText += `*And ${emojiList.length - 15} more emojis found...*\n`;
+        }
+
+        // 4. Buttons සැකසීම (මෙම Array එකට අවශ්‍ය buttons එකතු කරන්න)
+        const buttons = [
+            { buttonId: '.menu', buttonText: { displayText: '📜 Main Menu' }, type: 1 },
+            { buttonId: '.ping', buttonText: { displayText: '📶 Ping' }, type: 1 }
+        ];
+
+        // 5. සකස් කරගත් ප්‍රතිඵලය සහ buttons පරිශීලකයා වෙත යැවීම
+        const destinationJid = msg.key.remoteJid;
+        
+        // Button Message Structure එක
+        const buttonMessage = {
+            text: responseText,
+            footer: '𝜗𝜚 𝐄𝐦𝐨𝐣𝐢𝐃𝐁 𝐀𝐩𝐢 𝐁𝐲 𝐊 𝐂𝐞𝐘 🎀',
+            buttons: buttons,
+            headerType: 1, // Text header type
+            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+        };
+
+        await socket.sendMessage(destinationJid, buttonMessage, { quoted: msg });
+
+    } catch (err) {
+        console.error("EMOJI CMD ERROR:", err);
+        reply('❌ *Emoji සෙවීමේදී දෝෂයක් සිදු විය! කරුණාකර නැවත උත්සාහ කරන්න.*');
+    }
+    break;
+}
 
 
 // ════════════ ALIVE ════════════
