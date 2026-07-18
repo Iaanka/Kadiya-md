@@ -23,12 +23,6 @@ const yts = require('yt-search');
 const { ytmp3, ytmp4 } = require('sadaslk-dlcore');
 const os = require('os');
 const fecth = require('node-fetch');
-async function generateWelcomeCard({ title, subtitle, avatar }) {
-  const url = `https://abduxz-card.netlify.app/.netlify/functions/card?title=${encodeURIComponent(title)}&subtitle=${encodeURIComponent(subtitle)}&avatar=${encodeURIComponent(avatar)}`;
-  
-  const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 15000 });
-  return Buffer.from(res.data);
-}
 const ffmpeg = require("fluent-ffmpeg");
 const ffmpegPath = require("ffmpeg-static");
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -104,39 +98,6 @@ const SessionSchema = new mongoose.Schema({
         type: Date,
         default: Date.now
     }
-});
-socket.ev.on('group-participants.update', async (update) => {
-  if (update.action !== 'add') return;
-
-  try {
-    const groupMeta = await socket.groupMetadata(update.id);
-    const groupName = groupMeta.subject;
-
-    for (const participant of update.participants) {
-      const number = participant.split('@')[0];
-      let pfp;
-      try {
-        pfp = await socket.profilePictureUrl(participant, 'image');
-      } catch {
-        pfp = 'https://i.pravatar.cc/300?img=12'; // default avatar
-      }
-
-      const cardBuffer = await generateWelcomeCard({
-        title: `Welcome, ${number}`,
-        subtitle: `to ${groupName} 🎉`,
-        avatar: pfp
-      });
-
-      await socket.sendMessage(update.id, {
-        image: cardBuffer,
-        caption: `👋 *@${number}* join උනා group එකට!\n\nකරුණාකර *group rules* කියවලා rules follow කරන්න.`,
-        mentions: [participant],
-        contextInfo: arabianCtx()
-      });
-    }
-  } catch (e) {
-    console.error('Welcome card error:', e.message);
-  }
 });
 const Session = mongoose.model('Session', SessionSchema);
 
@@ -1100,34 +1061,7 @@ const downloadQuotedMedia = async (quoted) => {
 // ════════════ CARD ════════════
 // === Professional Card Generator Command ===
 
-case 'welcomecard': {
-  try {
-    const title = args.join(' ') || 'Alexander The Great';
-    const senderNumber = sender.split('@')[0];
-    let pfp;
-    try {
-      pfp = await socket.profilePictureUrl(msg.key.participant || sender, 'image');
-    } catch {
-      pfp = 'https://i.pravatar.cc/300?img=12';
-    }
 
-    const cardBuffer = await generateWelcomeCard({
-      title,
-      subtitle: 'Welcome to the VIP group',
-      avatar: pfp
-    });
-
-    await socket.sendMessage(sender, {
-      image: cardBuffer,
-      caption: `🎴 Card preview for *${title}*`,
-      contextInfo: arabianCtx()
-    }, { quoted: msg });
-
-  } catch (e) {
-    await reply(`Card generate වුනේ නෑ: ${e.message}`);
-  }
-  break;
-}
 // ════════════ ALIVE ════════════
 
 case 'alive': {
