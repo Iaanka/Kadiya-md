@@ -1100,81 +1100,33 @@ const downloadQuotedMedia = async (quoted) => {
 // ════════════ CARD ════════════
 // === Professional Card Generator Command ===
 
-case 'card':
-case 'wcard':
-case 'profilecard': {
+case 'welcomecard': {
+  try {
+    const title = args.join(' ') || 'Alexander The Great';
+    const senderNumber = sender.split('@')[0];
+    let pfp;
     try {
-        const axios = require('axios');
-
-        // 1. Target User (පණිවිඩය යැවූ පුද්ගලයා හෝ Reply කර ඇති පුද්ගලයා) හඳුනා ගැනීම
-        const quotedInfo = msg.message?.extendedTextMessage?.contextInfo;
-        const targetJid = quotedInfo?.participant || quotedInfo?.mentionedJid?.[0] || sender;
-        
-        // Target User ගේ නම ලබා ගැනීම
-        let targetName = 'User';
-        if (targetJid === sender) {
-            targetName = msg.pushName || 'WhatsApp User';
-        } else {
-            // වෙනත් කෙනෙකුට Reply කර ඇති විට ඔහුගේ නම සෙවීම (Bot එකෙහි getName function එකක් තිබේ නම්)
-            targetName = typeof socket.getName === 'function' ? await socket.getName(targetJid) : 'VIP Member';
-            if (targetName.includes('@')) targetName = 'VIP Member'; // නම සොයාගත නොහැකි වූ විට fallback එකක් ලෙස
-        }
-
-        // 2. Subtitle එක සකසා ගැනීම (Command එකෙන් පසු ලියන ලද text එක හෝ default text එකක්)
-        // 'q' යනු command එකට පසු ඇති වචන වේ. ඔබගේ bot හි මෙය args.join(" ") ලෙස ද තිබිය හැක.
-        let subtitleText = q ? q : 'Welcome to the VIP group';
-
-        // අකුරු වල දිග සීමා කිරීම (Card එකේ අකුරු කැපී යාම වැළැක්වීමට)
-        if (targetName.length > 25) targetName = targetName.substring(0, 22) + '...';
-        if (subtitleText.length > 45) subtitleText = subtitleText.substring(0, 42) + '...';
-
-        reply('⏳ *ඔබගේ සුවිශේෂී Card එක නිර්මාණය වෙමින් පවතී... කරුණාකර රැඳී සිටින්න!*');
-
-        // 3. Target User ගේ Profile Picture (Avatar) URL එක ලබා ගැනීම
-        let avatarUrl = 'https://i.imgur.com/6v6gZ0R.png'; // Default Avatar Fallback
-        try {
-            const ppUrl = await socket.profilePictureUrl(targetJid, 'image');
-            if (ppUrl) avatarUrl = ppUrl;
-        } catch (ppErr) {
-            // Profile පින්තූරයක් නොමැති නම් හෝ private දමා තිබේ නම් default එක භාවිතා වේ
-            console.log("No profile picture found, using default placeholder.");
-        }
-
-        // 4. API URL එක නිවැරදිව සකස් කර ගැනීම (URL Encoding සිදු කරයි)
-        const encodedTitle = encodeURIComponent(targetName);
-        const encodedSubtitle = encodeURIComponent(subtitleText);
-        const encodedAvatar = encodeURIComponent(avatarUrl);
-        
-        const apiUrl = `https://abduxz-card.netlify.app/.netlify/functions/card?title=${encodedTitle}&subtitle=${encodedSubtitle}&avatar=${encodedAvatar}`;
-
-        // 5. Axios මගින් Card Image එක Buffer එකක් ලෙස Download කර ගැනීම
-        const response = await axios({
-            method: 'get',
-            url: apiUrl,
-            responseType: 'arraybuffer',
-            timeout: 10000 // තත්පර 10කින් api එක ප්‍රතිචාර නොදක්වන්නේ නම් timeout වේ
-        });
-
-        const imageBuffer = Buffer.from(response.data, 'binary');
-
-        // 6. සාදන ලද Card එක අදාළ Chat එකට යැවීම
-        const destinationJid = msg.key.remoteJid;
-        const captionText = `*✨ ─── 𝗖𝗔𝗥𝗗 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗢𝗥 ─── ✨*\n\n` +
-                            `👤 *Name:* ${targetName}\n` +
-                            `💬 *Status:* ${subtitleText}\n\n` +
-                            `*🎨 Card Generated Successfully!*`;
-
-        await socket.sendMessage(destinationJid, {
-            image: imageBuffer,
-            caption: captionText,
-            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
-        }, { quoted: msg });
-
-    } catch (err) {
-        console.error("CARD GENERATOR ERROR:", err);
-        reply('❌ *Card එක සාදා ගැනීමට නොහැකි විය! කරුණාකර නැවත උත්සාහ කරන්න.*');
+      pfp = await socket.profilePictureUrl(msg.key.participant || sender, 'image');
+    } catch {
+      pfp = 'https://i.pravatar.cc/300?img=12';
     }
-    break;
+
+    const cardBuffer = await generateWelcomeCard({
+      title,
+      subtitle: 'Welcome to the VIP group',
+      avatar: pfp
+    });
+
+    await socket.sendMessage(sender, {
+      image: cardBuffer,
+      caption: `🎴 Card preview for *${title}*`,
+      contextInfo: arabianCtx()
+    }, { quoted: msg });
+
+  } catch (e) {
+    await reply(`Card generate වුනේ නෑ: ${e.message}`);
+  }
+  break;
 }
 // ════════════ ALIVE ════════════
 
