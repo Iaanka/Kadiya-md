@@ -1120,9 +1120,13 @@ case 'alive': {
 	}
 
 // ════════════ SONG ════════════
+// මෙම කොටස ඔබගේ Command file එකෙහි හෝ Switch-case එකෙහි 'song', 'ytmp3' ආදී Commands සදහා ආදේශ කරන්න.
+
 case 'song':
 case 'ytmp3':
 case 'music':
+case 'video':
+case 'ytv':
 case 'yta': {
     try {
         const query = args.join(' ');
@@ -1131,21 +1135,31 @@ case 'yta': {
         try { await socket.sendMessage(sender, { react: { text: '🔎', key: msg.key } }); } catch (_) {}
 
         // WhiteShadow YT APIs & Token
-        const API_TOKEN = "https://whiteshadow-x-api.onrender.com/api/download/ytmp3?url=https://youtu.be/dQw4w9WgXcQ&quality=320&apitoken=aWK0z4";
+        const API_TOKEN = "aWK0z4"; // API එකෙහි නිවැරදි Token එක මෙහි ඇතුලත් කරන්න
         const YT_SEARCH_API = "https://whiteshadow-x-api.onrender.com/api/search/yt";
-        const YT_DOWNLOAD_API = "https://whiteshadow-x-api.onrender.com/api/download/ytmp3";
-
+        
         let youtubeUrl = null;
         let songTitle = "Sadew-MD Audio";
+        let songThumb = "https://images.unsplash.com/photo-1614680376593-902f74fa0d41"; // Default fallback thumbnail
+        let duration = "Unknown";
+        let views = "Unknown";
 
         // 1. Check if input is a YouTube Link
         const regex = /(https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)[^\s?#]+)/i;
         const match = query.match(regex);
 
         if (match) {
-            // It's a link
             youtubeUrl = match[0].trim();
             reply("🔗 _YouTube link detected. Fetching data from server..._");
+            
+            // ලින්ක් එකක් නම්, එහි තොරතුරු සෙවීමට search api එකට query එක ලෙස ලින්ක් එක යවන්න පුළුවන් (API එක support කරන්නේ නම්)
+            const searchRes = await axios.get(`${YT_SEARCH_API}?q=${encodeURIComponent(youtubeUrl)}&apitoken=${API_TOKEN}`);
+            if (searchRes.data && searchRes.data.success && searchRes.data.result.length > 0) {
+                songTitle = searchRes.data.result[0].title || songTitle;
+                songThumb = searchRes.data.result[0].thumbnail || songThumb;
+                duration = searchRes.data.result[0].duration || duration;
+                views = searchRes.data.result[0].views || views;
+            }
         } else {
             // It's a name search
             reply(`🔍 _Searching YouTube for: "${query}"..._`);
@@ -1154,6 +1168,9 @@ case 'yta': {
             if (searchRes.data && searchRes.data.success && searchRes.data.result.length > 0) {
                 youtubeUrl = searchRes.data.result[0].url;
                 songTitle = searchRes.data.result[0].title || songTitle;
+                songThumb = searchRes.data.result[0].image || searchRes.data.result[0].thumbnail || songThumb;
+                duration = searchRes.data.result[0].timestamp || searchRes.data.result[0].duration || duration;
+                views = searchRes.data.result[0].views || views;
             }
         }
 
@@ -1162,44 +1179,153 @@ case 'yta': {
             return reply("❌ *Error:* සින්දුව හෝ වීඩියෝව සොයා ගැනීමට නොහැකි විය!");
         }
 
-        // 2. Download 320kbps MP3
-        reply("📥 _*👑𝗞ᴀᴅɪʏᴀ-𝙓-𝙈𝘿🔥*_ Extracting 320kbps High-Quality MP3..._");
+        // 2. Buttons පණිවිඩය නිර්මාණය කිරීම (Baileys Interactive Buttons Format)
+        // සටහන: නවතම WhatsApp updates වල Buttons පෙන්වීමට Template Buttons භාවිතා කරයි.
+        
+        const buttons = [
+            {
+                buttonId: `.download_audio ${youtubeUrl}`, // බොත්තම ක්ලික් කල විට trigger වන command එක
+                buttonText: { displayText: '🎵 Audio (320kbps)' },
+                type: 1
+            },
+            {
+                buttonId: `.download_video ${youtubeUrl}`, 
+                buttonText: { displayText: '🎥 Video (720p)' },
+                type: 1
+            },
+            {
+                buttonId: `.download_doc ${youtubeUrl}`, 
+                buttonText: { displayText: '📂 Document (File)' },
+                type: 1
+            }
+        ];
 
-        let audioDownloadUrl = null;
-        const dlRes = await axios.get(`${YT_DOWNLOAD_API}?url=${encodeURIComponent(youtubeUrl)}&quality=320&apitoken=${API_TOKEN}`);
+        const buttonMessage = {
+            image: { url: songThumb },
+            caption: `✨ *_👑𝗞ᴀᴅɪ𝗬𝗮-𝙓-𝙈𝘿🔥_ Music Downloader* ✨\n\n📌 *Title:* ${songTitle}\n🕒 *Duration:* ${duration}\n👁️ *Views:* ${views}\n🔗 *URL:* ${youtubeUrl}\n\n*පහත බොත්තම් භාවිතයෙන් ඔබට අවශ්‍ය Format එක තෝරාගන්න:*`,
+            footer: '© Powerd By Kadiya-X-MD 🇱🇰',
+            buttons: buttons,
+            headerType: 4
+        };
 
-        if (dlRes.data && dlRes.data.success && dlRes.data.result) {
-            audioDownloadUrl = dlRes.data.result.download_url;
-            songTitle = dlRes.data.result.title || songTitle;
-        }
-
-        if (!audioDownloadUrl) {
-            try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-            return reply("❌ *Error:* සේවාදායකයේ බිඳවැටීමක් හේතුවෙන් ඕඩියෝ එක ලබා ගැනීමට නොහැකි විය.");
-        }
-
-        try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
-
-        // Send Details Caption
-        const captionMsg = `✨ *_👑𝗞ᴀᴅɪʏᴀ-𝙓-𝙈𝘿🔥_ Music System* ✨\n\n📌 *Title:* ${songTitle}\n💿 *Quality:* 320kbps Ultra-High Quality\n🚀 *Status:* downloading...`;
-        await reply(captionMsg);
-
-        // 3. Send Audio File
-        const cleanFileName = songTitle.replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) + ".mp3";
-
-        await socket.sendMessage(sender, {
-            audio: { url: audioDownloadUrl },
-            mimetype: 'audio/mpeg',
-            fileName: cleanFileName,
-            ptt: false
-        }, { quoted: msg });
-
+        await socket.sendMessage(sender, buttonMessage, { quoted: msg });
         try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
 
     } catch (e) {
         console.log("SONG CMD ERROR:", e);
         try { await socket.sendMessage(sender, { react: { text: '❌', key: msg.key } }); } catch (_) {}
-        reply("❌ *Sadew-MD Internal Error:* " + e.message);
+        reply("❌ *Kadiya-X-MD Internal Error:* " + e.message);
+    }
+    break;
+}
+
+// ==========================================
+// 3. බොත්තම එබූ පසු ක්‍රියාත්මක වන Download Commands
+// මෙම කොටස් ඔබගේ Switch-case එකෙහි වෙනම Commands ලෙස එක් කරන්න.
+// ==========================================
+
+case 'download_audio': {
+    try {
+        const youtubeUrl = args[0];
+        if (!youtubeUrl) return reply("❌ වලංගු YouTube Link එකක් ලැබී නැත.");
+        
+        try { await socket.sendMessage(sender, { react: { text: '📥', key: msg.key } }); } catch (_) {}
+        reply("📥 _*👑𝗞ᴀᴅɪ𝗬𝗮-𝙓-𝙈𝘿🔥*_ Extracting 320kbps High-Quality MP3..._");
+
+        const API_TOKEN = "aWK0z4";
+        const YT_DOWNLOAD_API = "https://whiteshadow-x-api.onrender.com/api/download/ytmp3";
+
+        const dlRes = await axios.get(`${YT_DOWNLOAD_API}?url=${encodeURIComponent(youtubeUrl)}&quality=320&apitoken=${API_TOKEN}`);
+        
+        if (dlRes.data && dlRes.data.success && dlRes.data.result) {
+            const audioDownloadUrl = dlRes.data.result.download_url;
+            const songTitle = dlRes.data.result.title || "Kadiya-MD Audio";
+            const cleanFileName = songTitle.replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) + ".mp3";
+
+            // Send Audio File
+            await socket.sendMessage(sender, {
+                audio: { url: audioDownloadUrl },
+                mimetype: 'audio/mpeg',
+                fileName: cleanFileName,
+                ptt: false
+            }, { quoted: msg });
+
+            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        } else {
+            reply("❌ *Error:* සේවාදායකයෙන් ඕඩියෝ එක ලබා ගැනීමට නොහැකි විය.");
+        }
+    } catch (e) {
+        reply("❌ *Download Error:* " + e.message);
+    }
+    break;
+}
+
+case 'download_video': {
+    try {
+        const youtubeUrl = args[0];
+        if (!youtubeUrl) return reply("❌ වලංගු YouTube Link එකක් ලැබී නැත.");
+
+        try { await socket.sendMessage(sender, { react: { text: '🎥', key: msg.key } }); } catch (_) {}
+        reply("📥 _*👑𝗞ᴀᴅɪ𝗬𝗮-𝙓-𝙈𝘿🔥*_ Extracting High-Quality MP4 Video..._");
+
+        // මෙහිදී ඔබගේ YT Video Downloader API එක භාවිතා කරන්න (උදාහරණයක් ලෙස පහත පරිදි)
+        const API_TOKEN = "aWK0z4";
+        const YT_VIDEO_API = `https://whiteshadow-x-api.onrender.com/api/download/ytmp4`; // වීඩියෝ API එක
+
+        const dlRes = await axios.get(`${YT_VIDEO_API}?url=${encodeURIComponent(youtubeUrl)}&quality=720&apitoken=${API_TOKEN}`);
+        
+        if (dlRes.data && dlRes.data.success && dlRes.data.result) {
+            const videoDownloadUrl = dlRes.data.result.download_url;
+            const songTitle = dlRes.data.result.title || "Kadiya-MD Video";
+
+            // Send Video File
+            await socket.sendMessage(sender, {
+                video: { url: videoDownloadUrl },
+                mimetype: 'video/mp4',
+                caption: `📌 *Title:* ${songTitle}\n\n*Generated by Kadiya-X-MD*`
+            }, { quoted: msg });
+
+            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        } else {
+            reply("❌ *Error:* වීඩියෝ එක ලබා ගැනීමට නොහැකි විය.");
+        }
+    } catch (e) {
+        reply("❌ *Download Error:* " + e.message);
+    }
+    break;
+}
+
+case 'download_doc': {
+    try {
+        const youtubeUrl = args[0];
+        if (!youtubeUrl) return reply("❌ වලංගු YouTube Link එකක් ලැබී නැත.");
+
+        try { await socket.sendMessage(sender, { react: { text: '📂', key: msg.key } }); } catch (_) {}
+        reply("📥 _*👑𝗞ᴀᴅɪ𝗬𝗮-𝙓-𝙈𝘿🔥*_ Generating Document File..._");
+
+        const API_TOKEN = "aWK0z4";
+        const YT_DOWNLOAD_API = "https://whiteshadow-x-api.onrender.com/api/download/ytmp3";
+
+        const dlRes = await axios.get(`${YT_DOWNLOAD_API}?url=${encodeURIComponent(youtubeUrl)}&quality=320&apitoken=${API_TOKEN}`);
+        
+        if (dlRes.data && dlRes.data.success && dlRes.data.result) {
+            const audioDownloadUrl = dlRes.data.result.download_url;
+            const songTitle = dlRes.data.result.title || "Kadiya-MD Audio";
+            const cleanFileName = songTitle.replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) + ".mp3";
+
+            // Send Document File (පරිශීලකයාට Document එකක් ලෙස Audio එක යැවීමට)
+            await socket.sendMessage(sender, {
+                document: { url: audioDownloadUrl },
+                mimetype: 'audio/mpeg',
+                fileName: cleanFileName
+            }, { quoted: msg });
+
+            try { await socket.sendMessage(sender, { react: { text: '✅', key: msg.key } }); } catch (_) {}
+        } else {
+            reply("❌ *Error:* Document එක ලබා ගැනීමට නොහැකි විය.");
+        }
+    } catch (e) {
+        reply("❌ *Download Error:* " + e.message);
     }
     break;
 }
