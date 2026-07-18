@@ -1059,7 +1059,7 @@ const downloadQuotedMedia = async (quoted) => {
       break;
     }
 // ════════════ VV ════════════
-// === Case 'vv' හෝ 'viewonce' ක්‍රියාත්මක වන කොටස ===
+        // === Case 'vv' හෝ 'viewonce' ක්‍රියාත්මක වන කොටස ===
 
 case 'vv':
 case 'viewonce': {
@@ -1071,131 +1071,36 @@ case 'viewonce': {
             return reply('❌ *කරුණාකර View Once (Photo/Video) පණිවිඩයකට Reply කර මෙම Command එක භාවිතා කරන්න!*');
         }
 
-        // View once message එකක්දැයි පරීක්ෂා කිරීම (විවිධ ආකාරයේ structures සඳහා flexible check එකක්)
+        // View once message එකක්දැයි පරීක්ෂා කිරීම (Flexible check)
         let viewOnceContent = null;
-        
         if (quotedMsg.viewOnceMessageV2?.message) {
             viewOnceContent = quotedMsg.viewOnceMessageV2.message;
         } else if (quotedMsg.viewOnceMessage?.message) {
             viewOnceContent = quotedMsg.viewOnceMessage.message;
-        } else if (quotedMsg.imageMessage?.viewOnce === true || quotedMsg.imageMessage?.viewOnce) {
-            // ඇතැම් විට imageMessage එක ඇතුළෙන්ම viewOnce flag එක true වී තිබිය හැක
+        } else if (quotedMsg.imageMessage?.viewOnce || quotedMsg.imageMessage?.viewOnce === true) {
             viewOnceContent = quotedMsg;
-        } else if (quotedMsg.videoMessage?.viewOnce === true || quotedMsg.videoMessage?.viewOnce) {
-            // videoMessage සඳහාද එසේමය
+        } else if (quotedMsg.videoMessage?.viewOnce || quotedMsg.videoMessage?.viewOnce === true) {
             viewOnceContent = quotedMsg;
         }
         
         if (!viewOnceContent) {
-            // Debugging සඳහා console එකේ structure එක පෙන්වයි
-            console.log("QUOTED MSG STRUCTURE:", JSON.stringify(quotedMsg, null, 2));
             return reply('❌ *මෙය View Once පණිවිඩයක් නොවේ!*');
         }
 
         // පණිවිඩ වර්ගය හඳුනා ගැනීම (Image හෝ Video)
         const isImage = !!viewOnceContent.imageMessage;
-        const isVideo = !!viewOnceContent.videoMessage;
+        const mediaMessage = isImage ? viewOnceContent.imageMessage : viewOnceContent.videoMessage;
 
-        if (!isImage && !isVideo) {
+        if (!mediaMessage) {
             return reply('❌ *සහාය දක්වන්නේ View Once Photos සහ Videos සඳහා පමණි!*');
         }
 
-        // Reply කර ඇති පණිවිඩයේ ID එක සහ keys තබා ගැනීම
-        const quotedMessageId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        // === [ක්‍රමය 1] Direct Bypass (Buttons නැතිව සෘජුවම Download කිරීම - වඩාත්ම නිර්දේශිත ක්‍රමය) ===
+        // ඔබට Buttons අවශ්‍ය නැතිනම්, මෙම කොටස පමණක් තබාගෙන Buttons කොටස ඉවත් කළ හැක.
         
-        // Buttons Setup
-        const buttons = [
-            { 
-                buttonId: `.download_vv hd ${quotedMessageId}`, 
-                buttonText: { displayText: '✨ HD Quality' }, 
-                type: 1 
-            },
-            { 
-                buttonId: `.download_vv normal ${quotedMessageId}`, 
-                buttonText: { displayText: '🖼️ Normal Quality' }, 
-                type: 1 
-            },
-            { 
-                buttonId: '.menu', 
-                buttonText: { displayText: '📱 Main Menu' }, 
-                type: 1 
-            }
-        ];
+        reply(`⏳ *Bypassing ${isImage ? '📷 Photo' : '🎥 Video'}... Please wait...*`);
 
-        const buttonMessage = {
-            text: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗶𝗲𝘄 𝗢𝗻𝗰𝗲 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *${isImage ? '📷 Image' : '🎥 Video'}*\n\nපහත බොත්තම් භාවිතයෙන් ඔබට අවශ්‍ය Quality එක තෝරාගන්න.`,
-            footer: 'Akira MD View Once Downloader',
-            buttons: buttons,
-            headerType: 1,
-            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
-        };
-
-        await socket.sendMessage(sender, buttonMessage, { quoted: msg });
-
-    } catch (err) {
-        console.error("VV CMD ERROR:", err);
-        reply('❌ *යම් දෝෂයක් සිදු විය, කරුණාකර නැවත උත්සාහ කරන්න!*');
-    }
-    break;
-}
-
-// === BUTTONS ක්‍රියාත්මක වීමට සහ Media එක Download කර යැවීමට මෙම Case එක ===
-
-case 'download_vv': {
-    try {
-        const quality = args[0]; // hd හෝ normal
-        const targetMsgId = args[1]; // target message id
-
-        if (!quality || !targetMsgId) return reply('❌ *අදාළ තොරතුරු සොයාගත නොහැක!*');
-
-        let targetMsg;
-        if (typeof store !== 'undefined' && store.messages && store.messages[sender]) {
-            const list = store.messages[sender].array || store.messages[sender];
-            targetMsg = list.find(m => m.key.id === targetMsgId);
-        }
-
-        // Direct quoted message එකෙන්ද download කිරීමට උත්සාහ කරයි
-        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-        
-        let viewOnceContent = null;
-        if (quotedMsg) {
-            if (quotedMsg.viewOnceMessageV2?.message) {
-                viewOnceContent = quotedMsg.viewOnceMessageV2.message;
-            } else if (quotedMsg.viewOnceMessage?.message) {
-                viewOnceContent = quotedMsg.viewOnceMessage.message;
-            } else if (quotedMsg.imageMessage) {
-                viewOnceContent = quotedMsg;
-            } else if (quotedMsg.videoMessage) {
-                viewOnceContent = quotedMsg;
-            }
-        }
-
-        // Store එකෙන් සොයා ගැනීමට උත්සාහ කිරීම (quotedMsg නැතිනම්)
-        if (!viewOnceContent && targetMsg) {
-            const storeQuoted = targetMsg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            if (storeQuoted) {
-                if (storeQuoted.viewOnceMessageV2?.message) {
-                    viewOnceContent = storeQuoted.viewOnceMessageV2.message;
-                } else if (storeQuoted.viewOnceMessage?.message) {
-                    viewOnceContent = storeQuoted.viewOnceMessage.message;
-                } else if (storeQuoted.imageMessage) {
-                    viewOnceContent = storeQuoted;
-                } else if (storeQuoted.videoMessage) {
-                    viewOnceContent = storeQuoted;
-                }
-            }
-        }
-
-        if (!viewOnceContent) {
-            return reply('❌ *Media එක ලබා ගැනීමට නොහැකි විය. කරුණාකර නැවත Reply කර උත්සාහ කරන්න!*');
-        }
-
-        const isImage = !!viewOnceContent.imageMessage;
-        const mediaMessage = isImage ? viewOnceContent.imageMessage : viewOnceContent.videoMessage;
-
-        reply(`⏳ *Downloading ${quality.toUpperCase()} Quality Media...*`);
-
-        // Baileys media downloader
+        // Baileys media downloader භාවිතයෙන් media එක download කරගැනීම
         const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
         const mediaType = isImage ? 'image' : 'video';
         
@@ -1205,26 +1110,34 @@ case 'download_vv': {
             buffer = Buffer.concat([buffer, chunk]);
         }
 
-        const qualityText = quality === 'hd' ? '✨ HD Quality (Original)' : '🖼️ Normal Quality (Compressed)';
-
         if (isImage) {
             await socket.sendMessage(sender, {
                 image: buffer,
-                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽آ𝘀𝘀 🎀] ¡! ❞*\n\nQuality: *${qualityText}*\n\n📷 Bypass successfully!`,
+                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *📷 Image*\n\n📷 Bypass successfully!`,
                 contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
             }, { quoted: msg });
         } else {
             await socket.sendMessage(sender, {
                 video: buffer,
-                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽آ𝘀𝘀 🎀] ¡! ❞*\n\nQuality: *${qualityText}*\n\n🎥 Bypass successfully!`,
+                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *🎥 Video*\n\n🎥 Bypass successfully!`,
                 contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
             }, { quoted: msg });
         }
 
     } catch (err) {
-        console.error("DOWNLOAD VV ERROR:", err);
-        reply('❌ *Media එක download කිරීමට නොහැකි විය!*');
+        console.error("VV CMD ERROR:", err);
+        reply('❌ *යම් දෝෂයක් සිදු විය, කරුණාකර නැවත උත්සාහ කරන්න!*');
     }
+    break;
+}
+
+// === [ක්‍රමය 2] ඔබට අනිවාර්යයෙන්ම Buttons අවශ්‍ය නම් පමණක් පහත කේතය භාවිතා කරන්න ===
+// (මෙම ක්‍රමයේදී buttons හරහා ක්‍රියාත්මක වන විට store එකක් අවශ්‍ය නොවේ, direct download වේ)
+
+case 'download_vv_buttons_version': {
+    // සටහන: ඉහත Direct ක්‍රමය භාවිතා කරන්නේ නම් මෙම download_vv case එක අවශ්‍ය නොවේ.
+    // නමුත් ඔබ Buttons හරහාම යාමට බලාපොරොත්තු වන්නේ නම්, මුල් case එකේ reply එක වෙනුවට 
+    // මුළු mediaMessage object එකම stringify කර buttonId එක ලෙස යැවිය යුතුය.
     break;
 }
 // ════════════ ALIVE ════════════
