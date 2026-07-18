@@ -1059,7 +1059,7 @@ const downloadQuotedMedia = async (quoted) => {
       break;
     }
 // ════════════ VV ════════════
-        // === Case 'vv' හෝ 'viewonce' ක්‍රියාත්මක වන කොටස ===
+// === View Once (VV) Bypass Command ===
 
 case 'vv':
 case 'viewonce': {
@@ -1071,55 +1071,51 @@ case 'viewonce': {
             return reply('❌ *කරුණාකර View Once (Photo/Video) පණිවිඩයකට Reply කර මෙම Command එක භාවිතා කරන්න!*');
         }
 
-        // View once message එකක්දැයි පරීක්ෂා කිරීම (Flexible check)
-        let viewOnceContent = null;
-        if (quotedMsg.viewOnceMessageV2?.message) {
-            viewOnceContent = quotedMsg.viewOnceMessageV2.message;
-        } else if (quotedMsg.viewOnceMessage?.message) {
-            viewOnceContent = quotedMsg.viewOnceMessage.message;
-        } else if (quotedMsg.imageMessage?.viewOnce || quotedMsg.imageMessage?.viewOnce === true) {
-            viewOnceContent = quotedMsg;
-        } else if (quotedMsg.videoMessage?.viewOnce || quotedMsg.videoMessage?.viewOnce === true) {
-            viewOnceContent = quotedMsg;
+        // View Once පණිවිඩය නිවැරදිව හඳුනා ගැනීම
+        let viewOnceContent = quotedMsg.viewOnceMessageV2?.message || quotedMsg.viewOnceMessage?.message;
+        let mediaType = '';
+        let mediaMessage = null;
+
+        // Photo ද Video ද යන්න තහවුරු කර ගැනීම
+        if (viewOnceContent?.imageMessage || quotedMsg.imageMessage?.viewOnce) {
+            mediaType = 'image';
+            mediaMessage = viewOnceContent?.imageMessage || quotedMsg.imageMessage;
+        } else if (viewOnceContent?.videoMessage || quotedMsg.videoMessage?.viewOnce) {
+            mediaType = 'video';
+            mediaMessage = viewOnceContent?.videoMessage || quotedMsg.videoMessage;
         }
         
-        if (!viewOnceContent) {
-            return reply('❌ *මෙය View Once පණිවිඩයක් නොවේ!*');
-        }
-
-        // පණිවිඩ වර්ගය හඳුනා ගැනීම (Image හෝ Video)
-        const isImage = !!viewOnceContent.imageMessage;
-        const mediaMessage = isImage ? viewOnceContent.imageMessage : viewOnceContent.videoMessage;
-
         if (!mediaMessage) {
-            return reply('❌ *සහාය දක්වන්නේ View Once Photos සහ Videos සඳහා පමණි!*');
+            return reply('❌ *මෙය View Once පණිවිඩයක් නොවේ! සහාය දක්වන්නේ View Once Photos සහ Videos සඳහා පමණි.*');
         }
 
-        // === [ක්‍රමය 1] Direct Bypass (Buttons නැතිව සෘජුවම Download කිරීම - වඩාත්ම නිර්දේශිත ක්‍රමය) ===
-        // ඔබට Buttons අවශ්‍ය නැතිනම්, මෙම කොටස පමණක් තබාගෙන Buttons කොටස ඉවත් කළ හැක.
-        
-        reply(`⏳ *Bypassing ${isImage ? '📷 Photo' : '🎥 Video'}... Please wait...*`);
+        reply(`⏳ *Bypassing ${mediaType === 'image' ? '📷 Photo' : '🎥 Video'}... Please wait...*`);
 
         // Baileys media downloader භාවිතයෙන් media එක download කරගැනීම
         const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-        const mediaType = isImage ? 'image' : 'video';
         
         const stream = await downloadContentFromMessage(mediaMessage, mediaType);
         let buffer = Buffer.from([]);
+        
         for await (const chunk of stream) {
             buffer = Buffer.concat([buffer, chunk]);
         }
 
-        if (isImage) {
+        // Caption එක සැකසීම
+        const captionText = `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *${mediaType === 'image' ? '📷 Image' : '🎥 Video'}*\n\n✅ Bypass successfully!`;
+
+        // නැවත යැවීම (Media වර්ගය අනුව)
+        if (mediaType === 'image') {
             await socket.sendMessage(sender, {
                 image: buffer,
-                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *📷 Image*\n\n📷 Bypass successfully!`,
-                contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+                caption: captionText,
+                // ඔයාගේ arabianCtx function එක තිබේනම් පමණක් එය ක්‍රියාත්මක කරන්න
+                contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined 
             }, { quoted: msg });
         } else {
             await socket.sendMessage(sender, {
                 video: buffer,
-                caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *🎥 Video*\n\n🎥 Bypass successfully!`,
+                caption: captionText,
                 contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
             }, { quoted: msg });
         }
@@ -1128,16 +1124,6 @@ case 'viewonce': {
         console.error("VV CMD ERROR:", err);
         reply('❌ *යම් දෝෂයක් සිදු විය, කරුණාකර නැවත උත්සාහ කරන්න!*');
     }
-    break;
-}
-
-// === [ක්‍රමය 2] ඔබට අනිවාර්යයෙන්ම Buttons අවශ්‍ය නම් පමණක් පහත කේතය භාවිතා කරන්න ===
-// (මෙම ක්‍රමයේදී buttons හරහා ක්‍රියාත්මක වන විට store එකක් අවශ්‍ය නොවේ, direct download වේ)
-
-case 'download_vv_buttons_version': {
-    // සටහන: ඉහත Direct ක්‍රමය භාවිතා කරන්නේ නම් මෙම download_vv case එක අවශ්‍ය නොවේ.
-    // නමුත් ඔබ Buttons හරහාම යාමට බලාපොරොත්තු වන්නේ නම්, මුල් case එකේ reply එක වෙනුවට 
-    // මුළු mediaMessage object එකම stringify කර buttonId එක ලෙස යැවිය යුතුය.
     break;
 }
 // ════════════ ALIVE ════════════
