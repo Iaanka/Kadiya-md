@@ -1058,71 +1058,82 @@ const downloadQuotedMedia = async (quoted) => {
 
       break;
     }
-// ════════════ VV ════════════
-// === View Once (VV) Bypass Command ===
+// ════════════ CARD ════════════
+// === Professional Card Generator Command ===
 
-case 'vv':
-case 'viewonce': {
+case 'card':
+case 'wcard':
+case 'profilecard': {
     try {
-        // Reply කර ඇති පණිවිඩය ලබා ගැනීම
-        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        const axios = require('axios');
+
+        // 1. Target User (පණිවිඩය යැවූ පුද්ගලයා හෝ Reply කර ඇති පුද්ගලයා) හඳුනා ගැනීම
+        const quotedInfo = msg.message?.extendedTextMessage?.contextInfo;
+        const targetJid = quotedInfo?.participant || quotedInfo?.mentionedJid?.[0] || sender;
         
-        if (!quotedMsg) {
-            return reply('❌ *කරුණාකර View Once (Photo/Video) පණිවිඩයකට Reply කර මෙම Command එක භාවිතා කරන්න!*');
-        }
-
-        // View Once පණිවිඩය නිවැරදිව හඳුනා ගැනීම
-        let viewOnceContent = quotedMsg.viewOnceMessageV2?.message || quotedMsg.viewOnceMessage?.message;
-        let mediaType = '';
-        let mediaMessage = null;
-
-        // Photo ද Video ද යන්න තහවුරු කර ගැනීම
-        if (viewOnceContent?.imageMessage || quotedMsg.imageMessage?.viewOnce) {
-            mediaType = 'image';
-            mediaMessage = viewOnceContent?.imageMessage || quotedMsg.imageMessage;
-        } else if (viewOnceContent?.videoMessage || quotedMsg.videoMessage?.viewOnce) {
-            mediaType = 'video';
-            mediaMessage = viewOnceContent?.videoMessage || quotedMsg.videoMessage;
-        }
-        
-        if (!mediaMessage) {
-            return reply('❌ *මෙය View Once පණිවිඩයක් නොවේ! සහාය දක්වන්නේ View Once Photos සහ Videos සඳහා පමණි.*');
-        }
-
-        reply(`⏳ *Bypassing ${mediaType === 'image' ? '📷 Photo' : '🎥 Video'}... Please wait...*`);
-
-        // Baileys media downloader භාවිතයෙන් media එක download කරගැනීම
-        const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
-        
-        const stream = await downloadContentFromMessage(mediaMessage, mediaType);
-        let buffer = Buffer.from([]);
-        
-        for await (const chunk of stream) {
-            buffer = Buffer.concat([buffer, chunk]);
-        }
-
-        // Caption එක සැකසීම
-        const captionText = `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *${mediaType === 'image' ? '📷 Image' : '🎥 Video'}*\n\n✅ Bypass successfully!`;
-
-        // නැවත යැවීම (Media වර්ගය අනුව)
-        if (mediaType === 'image') {
-            await socket.sendMessage(sender, {
-                image: buffer,
-                caption: captionText,
-                // ඔයාගේ arabianCtx function එක තිබේනම් පමණක් එය ක්‍රියාත්මක කරන්න
-                contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined 
-            }, { quoted: msg });
+        // Target User ගේ නම ලබා ගැනීම
+        let targetName = 'User';
+        if (targetJid === sender) {
+            targetName = msg.pushName || 'WhatsApp User';
         } else {
-            await socket.sendMessage(sender, {
-                video: buffer,
-                caption: captionText,
-                contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
-            }, { quoted: msg });
+            // වෙනත් කෙනෙකුට Reply කර ඇති විට ඔහුගේ නම සෙවීම (Bot එකෙහි getName function එකක් තිබේ නම්)
+            targetName = typeof socket.getName === 'function' ? await socket.getName(targetJid) : 'VIP Member';
+            if (targetName.includes('@')) targetName = 'VIP Member'; // නම සොයාගත නොහැකි වූ විට fallback එකක් ලෙස
         }
+
+        // 2. Subtitle එක සකසා ගැනීම (Command එකෙන් පසු ලියන ලද text එක හෝ default text එකක්)
+        // 'q' යනු command එකට පසු ඇති වචන වේ. ඔබගේ bot හි මෙය args.join(" ") ලෙස ද තිබිය හැක.
+        let subtitleText = q ? q : 'Welcome to the VIP group';
+
+        // අකුරු වල දිග සීමා කිරීම (Card එකේ අකුරු කැපී යාම වැළැක්වීමට)
+        if (targetName.length > 25) targetName = targetName.substring(0, 22) + '...';
+        if (subtitleText.length > 45) subtitleText = subtitleText.substring(0, 42) + '...';
+
+        reply('⏳ *ඔබගේ සුවිශේෂී Card එක නිර්මාණය වෙමින් පවතී... කරුණාකර රැඳී සිටින්න!*');
+
+        // 3. Target User ගේ Profile Picture (Avatar) URL එක ලබා ගැනීම
+        let avatarUrl = 'https://i.imgur.com/6v6gZ0R.png'; // Default Avatar Fallback
+        try {
+            const ppUrl = await socket.profilePictureUrl(targetJid, 'image');
+            if (ppUrl) avatarUrl = ppUrl;
+        } catch (ppErr) {
+            // Profile පින්තූරයක් නොමැති නම් හෝ private දමා තිබේ නම් default එක භාවිතා වේ
+            console.log("No profile picture found, using default placeholder.");
+        }
+
+        // 4. API URL එක නිවැරදිව සකස් කර ගැනීම (URL Encoding සිදු කරයි)
+        const encodedTitle = encodeURIComponent(targetName);
+        const encodedSubtitle = encodeURIComponent(subtitleText);
+        const encodedAvatar = encodeURIComponent(avatarUrl);
+        
+        const apiUrl = `https://abduxz-card.netlify.app/.netlify/functions/card?title=${encodedTitle}&subtitle=${encodedSubtitle}&avatar=${encodedAvatar}`;
+
+        // 5. Axios මගින් Card Image එක Buffer එකක් ලෙස Download කර ගැනීම
+        const response = await axios({
+            method: 'get',
+            url: apiUrl,
+            responseType: 'arraybuffer',
+            timeout: 10000 // තත්පර 10කින් api එක ප්‍රතිචාර නොදක්වන්නේ නම් timeout වේ
+        });
+
+        const imageBuffer = Buffer.from(response.data, 'binary');
+
+        // 6. සාදන ලද Card එක අදාළ Chat එකට යැවීම
+        const destinationJid = msg.key.remoteJid;
+        const captionText = `*✨ ─── 𝗖𝗔𝗥𝗗 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗢𝗥 ─── ✨*\n\n` +
+                            `👤 *Name:* ${targetName}\n` +
+                            `💬 *Status:* ${subtitleText}\n\n` +
+                            `*🎨 Card Generated Successfully!*`;
+
+        await socket.sendMessage(destinationJid, {
+            image: imageBuffer,
+            caption: captionText,
+            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+        }, { quoted: msg });
 
     } catch (err) {
-        console.error("VV CMD ERROR:", err);
-        reply('❌ *යම් දෝෂයක් සිදු විය, කරුණාකර නැවත උත්සාහ කරන්න!*');
+        console.error("CARD GENERATOR ERROR:", err);
+        reply('❌ *Card එක සාදා ගැනීමට නොහැකි විය! කරුණාකර නැවත උත්සාහ කරන්න.*');
     }
     break;
 }
