@@ -1058,7 +1058,153 @@ const downloadQuotedMedia = async (quoted) => {
 
       break;
     }
+// ════════════ VV ════════════
+					
+  // === මෙය ඔබේ Message Handler එකේ (command switch-case එකට පෙර හෝ text/command හඳුනාගන්නා ස්ථානයේ) ඇතුළත් කරන්න ===
+// පරිශීලකයා එවූ පෙළ (text/body) ලබා ගැනීම
+const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "";
+const prefix = /^[°•π÷×¶∆£¢€¥®™✓_=|~!?@#$%^&.\/\\©^]/.test(body) ? body.match(/^[°•π÷×¶∆£¢€¥®™✓_=|~!?@#$%^&.\/\\©^]/)[0] : '';
+const cmd = body.startsWith(prefix) ? body.slice(prefix.length).trim().split(/ +/).shift().toLowerCase() : body.trim();
 
+// Regex එකකින් පරීක්ෂා කරනවා එවූ පෙළෙහි හරියටම ඉමොජි 3ක් පමණක් තිබේද කියා
+// මෙමඟින් ඕනෑම ඉමොජි 3ක් reply කළ විට ක්‍රියාත්මක වේ.
+const emojiRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F){3}$/u;
+const isThreeEmojis = emojiRegex.test(body.trim());
+
+// Command එක '.vv' හෝ '.viewonce' හෝ 'ඉමොජි 3ක්' නම් trigger වීම සඳහා:
+const isVvCommand = (cmd === 'vv' || cmd === 'viewonce' || isThreeEmojis);
+
+// === Switch-Case හෝ Conditional Block එක තුළ භාවිතා කිරීමට කේතය ===
+
+if (isVvCommand) {
+    try {
+        // Reply කර ඇති පණිවිඩය ලබා ගැනීම
+        const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+        
+        if (!quotedMsg) {
+            // පරිශීලකයා ඉමොජි 3ක් එව්වත් එය view once එකකට reply එකක් නොවේ නම් සාමාන්‍ය පරිදි ignore කරයි 
+            // නැතහොත් command එකක් ලෙස (.vv) එවා ඇත්නම් පමණක් message එකක් පෙන්වයි.
+            if (!isThreeEmojis) {
+                return reply('❌ *කරුණාකර View Once (Photo/Video) පණිවිඩයකට Reply කර මෙම Command එක භාවිතා කරන්න!*');
+            }
+            return; // ඉමොජි 3ක් නිකන්ම එවා ඇත්නම් ignore කරයි
+        }
+
+        // View once message එකක්දැයි පරීක්ෂා කිරීම (Photo හෝ Video)
+        const viewOnceContent = quotedMsg.viewOnceMessageV2?.message || quotedMsg.viewOnceMessage?.message;
+        
+        if (!viewOnceContent) {
+            if (!isThreeEmojis) {
+                return reply('❌ *මෙය View Once පණිවිඩයක් නොවේ!*');
+            }
+            return;
+        }
+
+        // පණිවිඩ වර්ගය හඳුනා ගැනීම (Image හෝ Video)
+        const isImage = !!viewOnceContent.imageMessage;
+        const isVideo = !!viewOnceContent.videoMessage;
+
+        if (!isImage && !isVideo) {
+            if (!isThreeEmojis) {
+                return reply('❌ *සහාය දක්වන්නේ View Once Photos සහ Videos සඳහා පමණි!*');
+            }
+            return;
+        }
+
+        // Reply කර ඇති පණිවිඩයේ ID එක ලබා ගැනීම
+        const quotedMessageId = msg.message?.extendedTextMessage?.contextInfo?.stanzaId;
+        
+        // Buttons Setup
+        const buttons = [
+            { 
+                buttonId: `.download_vv hd ${quotedMessageId}`, 
+                buttonText: { displayText: '✨ HD Quality' }, 
+                type: 1 
+            },
+            { 
+                buttonId: `.download_vv normal ${quotedMessageId}`, 
+                buttonText: { displayText: '🖼️ Normal Quality' }, 
+                type: 1 
+            },
+            { 
+                buttonId: '.menu', // Menu command එක auto trigger කිරීමට
+                buttonText: { displayText: '📱 Main Menu' }, 
+                type: 1 
+            }
+        ];
+
+        const buttonMessage = {
+            text: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗶𝗲𝘄 𝗢𝗻𝗰𝗲 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nType: *${isImage ? '📷 Image' : '🎥 Video'}*\n\nපහත බොත්තම් භාවිතයෙන් ඔබට අවශ්‍ය Quality එක තෝරාගන්න.`,
+            footer: 'Akira MD View Once Downloader',
+            buttons: buttons,
+            headerType: 1,
+            contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+        };
+
+        await socket.sendMessage(sender, buttonMessage, { quoted: msg });
+
+    } catch (err) {
+        console.error("VV CMD ERROR:", err);
+        reply('❌ *යම් දෝෂයක් සිදු විය, කරුණාකර නැවත උත්සාහ කරන්න!*');
+    }
+}
+
+// === BUTTONS ක්‍රියාත්මක වීමට සහ Media එක Download කර යැවීමට මෙම Case එක switch එක ඇතුළත තබන්න ===
+
+switch (cmd) {
+    case 'download_vv': {
+        try {
+            const quality = args[0]; // hd හෝ normal
+            const targetMsgId = args[1]; // target message id
+
+            if (!quality || !targetMsgId) return reply('❌ *අදාළ තොරතුරු සොයාගත නොහැක!*');
+
+            // Quoted message එකෙන් media එක retrieve කර ගැනීම
+            const quotedMsg = msg.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            const viewOnceContent = quotedMsg?.viewOnceMessageV2?.message || quotedMsg?.viewOnceMessage?.message;
+
+            if (!viewOnceContent) {
+                return reply('❌ *Media එක ලබා ගැනීමට නොහැකි විය. කරුණාකර නැවත Reply කර උත්සාහ කරන්න!*');
+            }
+
+            const isImage = !!viewOnceContent.imageMessage;
+            const mediaMessage = isImage ? viewOnceContent.imageMessage : viewOnceContent.videoMessage;
+
+            reply(`⏳ *Downloading ${quality.toUpperCase()} Quality Media...*`);
+
+            // Baileys media downloader
+            const { downloadContentFromMessage } = require('@whiskeysockets/baileys');
+            const mediaType = isImage ? 'image' : 'video';
+            
+            const stream = await downloadContentFromMessage(mediaMessage, mediaType);
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) {
+                buffer = Buffer.concat([buffer, chunk]);
+            }
+
+            const qualityText = quality === 'hd' ? '✨ HD Quality (Original)' : '🖼️ Normal Quality (Compressed)';
+
+            if (isImage) {
+                await socket.sendMessage(sender, {
+                    image: buffer,
+                    caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nQuality: *${qualityText}*\n\n📷 Bypass successfully!`,
+                    contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+                }, { quoted: msg });
+            } else {
+                await socket.sendMessage(sender, {
+                    video: buffer,
+                    caption: `*↳ ❝ [🎀 𝗔𝗸𝗶𝗿𝗮 𝗩𝗩 𝗕𝘆𝗽𝗮𝘀𝘀 🎀] ¡! ❞*\n\nQuality: *${qualityText}*\n\n🎥 Bypass successfully!`,
+                    contextInfo: typeof arabianCtx === 'function' ? arabianCtx() : undefined
+                }, { quoted: msg });
+            }
+
+        } catch (err) {
+            console.error("DOWNLOAD VV ERROR:", err);
+            reply('❌ *Media එක download කිරීමට නොහැකි විය!*');
+        }
+        break;
+    }
+			}					
 // ════════════ ALIVE ════════════
 
 case 'alive': {
