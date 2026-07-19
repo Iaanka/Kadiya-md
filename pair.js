@@ -1037,17 +1037,26 @@ const downloadQuotedMedia = async (quoted) => {
 		}					
     // ════════════ ALIVE ════════════  
 	case 'wiki': {
+    // args, from, msg (හෝ quoted) සහ බොට් client එකෙහි variable එක (sock/conn) ඔබේ බොට් එකට ගැලපෙන ලෙස පරීක්ෂා කර ගන්න.
+    // 'sock is not defined' error එක ආවොත් 'sock' වෙනුවට ඔබේ බොට් එකේ ඇති variable එක (උදා: conn, client) යොදන්න.
+    const client = typeof sock !== 'undefined' ? sock : (typeof conn !== 'undefined' ? conn : null);
+    
+    if (!client) {
+        console.error('❌ Error: WhatsApp client variable (sock or conn) is not defined!');
+        break;
+    }
+
     const query = args.join(' ').trim();
 
     if (!query) {
-        await sock.sendMessage(from, {
+        await client.sendMessage(from, {
             text: '❌ Search කරන්න දෙයක් දෙන්න!\n\nUsage: *!wiki Sri Lanka*'
         }, { quoted: msg });
         break;
     }
 
     try {
-        await sock.sendMessage(from, { text: '🔍 Searching Wikipedia...' }, { quoted: msg });
+        await client.sendMessage(from, { text: '🔍 Searching Wikipedia...' }, { quoted: msg });
 
         const apiUrl = 'https://whiteshadow-x-api.onrender.com/api/search/wikipedia-details';
         const { data } = await axios.get(apiUrl, {
@@ -1055,13 +1064,13 @@ const downloadQuotedMedia = async (quoted) => {
                 q: query,
                 lang: 'en',
                 limit: 3,
-                apitoken: 'aWK0z4'
+                apitoken: 'aWK0z4' // ඔබ ලබාදුන් සක්‍රීය API Token එක මෙහි ඇතුලත් කර ඇත
             },
             timeout: 15000
         });
 
         if (!data || !data.success || !Array.isArray(data.results) || data.results.length === 0) {
-            await sock.sendMessage(from, {
+            await client.sendMessage(from, {
                 text: `❌ "${query}" වලට Wikipedia results හම්බුනේ නැහැ.`
             }, { quoted: msg });
             break;
@@ -1072,41 +1081,42 @@ const downloadQuotedMedia = async (quoted) => {
             return text.length <= maxLen ? text : text.slice(0, maxLen).trim() + '...';
         };
 
-        let reply = `📚 *Wikipedia Search: ${data.query}*\n_Found ${data.total} result(s)_\n\n`;
+        let reply = `📚 *Wikipedia Search: ${data.query || query}*\n_Found ${data.total || data.results.length} result(s)_\n\n`;
 
         data.results.forEach((item, i) => {
-            reply += `*${i + 1}. ${item.title}*\n`;
-            reply += `_${item.description || ''}_\n`;
-            reply += `${trimContent(item.detail && item.detail.content)}\n`;
-            reply += `🔗 ${(item.detail && item.detail.url) || ''}\n\n`;
+            const description = item.description ? `_${item.description}_\n` : '';
+            const content = item.detail && item.detail.content ? `${trimContent(item.detail.content)}\n` : '';
+            const url = item.detail && item.detail.url ? `🔗 ${item.detail.url}\n` : '';
+            
+            reply += `*${i + 1}. ${item.title}*\n${description}${content}${url}\n`;
         });
 
         const firstThumb = data.results[0] && data.results[0].thumbnail;
 
-        if (firstThumb) {
-            await sock.sendMessage(from, {
+        if (firstThumb && firstThumb.startsWith('http')) {
+            await client.sendMessage(from, {
                 image: { url: firstThumb },
                 caption: reply.trim()
             }, { quoted: msg });
         } else {
-            await sock.sendMessage(from, { text: reply.trim() }, { quoted: msg });
+            await client.sendMessage(from, { text: reply.trim() }, { quoted: msg });
         }
 
     } catch (err) {
         console.error('❌ !wiki command error:', (err.response && err.response.data) || err.message);
 
         if (err.response && err.response.status === 401) {
-            await sock.sendMessage(from, {
+            await client.sendMessage(from, {
                 text: '❌ API token invalid/expired. Owner ට කියන්න token එක update කරන්න.'
             }, { quoted: msg });
         } else {
-            await sock.sendMessage(from, {
+            await client.sendMessage(from, {
                 text: '❌ Wikipedia search fail වුනා. Try again later.'
             }, { quoted: msg });
         }
     }
     break;
-	}
+}
     // ════════════ PING ════════════
       
     case 'ping': {
