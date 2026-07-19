@@ -40,10 +40,10 @@ module.exports = {
     const footer = '> *𝗔esthatic 𝗤ueen 𝗕y 𝗜sanka ⋆*';
 
     const buttons = [
-      { buttonId: `${prefix}menu`, buttonText: { displayText: '1️⃣ Menu' }, type: 1 },
-      { buttonId: `${prefix}ping`, buttonText: { displayText: '2️⃣ Ping' }, type: 1 },
-      { buttonId: `${prefix}song`, buttonText: { displayText: '3️⃣ Song' }, type: 1 },
-      { buttonId: `${prefix}owner`, buttonText: { displayText: '4️⃣ Owner' }, type: 1 }
+      { buttonId: `${prefix}menu`, buttonText: { displayText: '🤍 Menu' }, type: 1 },
+      { buttonId: `${prefix}ping`, buttonText: { displayText: '🧧 Ping' }, type: 1 },
+      { buttonId: `${prefix}song`, buttonText: { displayText: '🎵 Song' }, type: 1 },
+      { buttonId: `${prefix}owner`, buttonText: { displayText: '👽 Owner' }, type: 1 }
     ];
 
     await socket.sendMessage(sender, {
