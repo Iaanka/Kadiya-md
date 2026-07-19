@@ -1018,7 +1018,6 @@ const downloadQuotedMedia = async (quoted) => {
                     generateForwardMessageContent, prepareWAMessageMedia, fetchLatestBaileysVersion,
                     generateMessageID, DisconnectReason, MessageRetryMap, makeWASocket,
                     NUMBER_LIST_PATH, SESSION_BASE_PATH,
-                    sanitizedNumber: number, socketCreationTime,
                 };
                 await cmdDef.execute(ctx);
             }
