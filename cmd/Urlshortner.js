@@ -6,6 +6,10 @@
 
 const axios = require('axios');
 
+// Matches a URL anywhere in the string, trims trailing punctuation
+const URL_REGEX = /https?:\/\/[^\s]+/i;
+const TRAILING_JUNK = /[.,;:!?)\]}'"]+$/;
+
 module.exports = {
   name: 'shortlink',
   aliases: ['short', 'shorten'],
@@ -22,18 +26,14 @@ module.exports = {
 
     try { await socket.sendMessage(sender, { react: { text: '🔗', key: msg.key } }); } catch (_) {}
 
-    const url = text?.trim();
+    // Look in the command text first, fall back to the quoted message body
+    const rawSource = (text && text.trim()) || quoted?.text || quoted?.body || '';
+    const found = rawSource.match(URL_REGEX);
+    const url = found ? found[0].replace(TRAILING_JUNK, '') : null;
 
     if (!url) {
       return socket.sendMessage(sender, {
-        text: `*⚠️ Usage:* ${prefix}shortlink <url>\n*Example:* ${prefix}shortlink kadiya-md-production.up.railway.app`,
-        contextInfo: arabianCtx()
-      }, { quoted: msg });
-    }
-
-    if (!/^https?:\/\//i.test(url)) {
-      return socket.sendMessage(sender, {
-        text: `*⚠️ Invalid URL.* Make sure it starts with http:// or https://`,
+        text: `*⚠️ Usage:* ${prefix}shortlink <url>\n*Example:* ${prefix}shortlink https://github.com\n_(or reply/quote a message containing a link)_`,
         contextInfo: arabianCtx()
       }, { quoted: msg });
     }
