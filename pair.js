@@ -841,9 +841,9 @@ const recentCallers = new Set();
       const msg = messages[0];
         if (!msg.message) return;
         
-const type = getContentType(msg.message);
         if (!msg.message) return;
         msg.message = (getContentType(msg.message) === 'ephemeralMessage') ? msg.message.ephemeralMessage.message : msg.message;
+        const type = getContentType(msg.message);
                                                        const m = sms(socket, msg);                                                
 const quoted =
             type == "extendedTextMessage" &&
