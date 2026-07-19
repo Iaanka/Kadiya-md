@@ -80,7 +80,7 @@ const CATEGORIES = [
 
 // Prefix used to invoke a command when a list row is tapped.
 // Change this if your bot's real prefix differs.
-const PREFIX = '•';
+const PREFIX = '.';
 
 function buildSections() {
   return CATEGORIES.map((cat) => ({
